@@ -19,7 +19,7 @@ export type DecisionResult = {
   };
   decision: {
     template: Template;
-    difficulty: 1 | 2 | 3 | 4 | 5;
+    difficulty: 1 | 2 | 3;
     cognitiveSkill: CognitiveSkill;
     confidence: number;
     reason: string;

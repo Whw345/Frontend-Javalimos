@@ -31,10 +31,10 @@ describe("decisionResultSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects a difficulty outside the 1 to 5 range", () => {
+  it("rejects a difficulty outside the 1 to 3 range", () => {
     const result = decisionResultSchema.safeParse({
       ...validDecision,
-      decision: { ...validDecision.decision, difficulty: 6 },
+      decision: { ...validDecision.decision, difficulty: 4 },
     });
 
     expect(result.success).toBe(false);
