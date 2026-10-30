@@ -12,6 +12,7 @@
   <a href="#demo"><strong>Demo</strong></a> ·
   <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
   <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
+  <a href="#cicd"><strong>CI/CD</strong></a> ·
   <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
   <a href="#more-supabase-examples"><strong>More Examples</strong></a>
 </p>
@@ -119,6 +120,35 @@ Both `SUPABASE_URL` and `SUPABASE_SECRET_KEY` can be found in [your Supabase pro
 6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+
+## CI/CD
+
+[`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) runs lint and build on every pull request and every push to `main`. If they pass, it deploys to Vercel: a preview for pull requests and production for `main`. The URL shows up in the pull request and in the repository's Deployments page. Pull requests from forks only run the checks.
+
+[`vercel.json`](vercel.json) turns off Vercel's own Git deployments, so each commit deploys once and only after its checks pass. Changes in `db/` aren't applied by the pipeline: run them in the SQL Editor before merging.
+
+To set it up once:
+
+1. Link the repository to a Vercel project. This creates `.vercel/project.json`, which is gitignored and holds the `orgId` and `projectId` used in step 3:
+
+   ```bash
+   npx vercel link
+   ```
+
+2. In **Settings > Environment Variables** of the Vercel project, add the variables from `.env.example`:
+
+   - **Production**: all of them, with `BETTER_AUTH_URL` set to your production URL.
+   - **Preview**: all of them except `BETTER_AUTH_URL`, so Better Auth takes the origin from each request. Use a separate Supabase project, or previews will read and write production data.
+
+3. Create a token in [your Vercel account settings](https://vercel.com/account/tokens) and add these in **Settings > Secrets and variables > Actions** of the GitHub repository:
+
+   | Secret              | Value                                   |
+   | ------------------- | --------------------------------------- |
+   | `VERCEL_TOKEN`      | The token                               |
+   | `VERCEL_ORG_ID`     | `orgId` from `.vercel/project.json`     |
+   | `VERCEL_PROJECT_ID` | `projectId` from `.vercel/project.json` |
+
+4. Add `https://your-domain.com/api/auth/callback/google` as an authorized redirect URI of the Google client. Preview URLs change on every deployment and Google doesn't accept wildcards, so previews only support email and password.
 
 ## Feedback and issues
 

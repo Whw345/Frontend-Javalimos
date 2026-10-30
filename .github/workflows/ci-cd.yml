@@ -1,0 +1,65 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new commit replaces the running checks of its pull request. Runs on main
+# are never cancelled halfway, so production deployments stay in order.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+  VERCEL_CLI_VERSION: 65.8.0
+
+jobs:
+  ci:
+    name: Lint and build
+    runs-on: ubuntu-latest
+    env:
+      # The build never reaches the database. These only keep Better Auth from
+      # logging errors while it's imported during the build.
+      BETTER_AUTH_SECRET: ci-build-only-not-a-real-secret-value
+      BETTER_AUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # next build also type checks.
+      - run: npm run build
+
+  deploy:
+    name: Deploy to Vercel
+    needs: ci
+    # Pull requests from forks don't receive the repository secrets.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'push' && 'Production' || 'Preview' }}
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TARGET: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+      VERCEL_PROD_FLAG: ${{ github.event_name == 'push' && '--prod' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm install --global "vercel@$VERCEL_CLI_VERSION"
+      - run: vercel pull --yes --environment="$VERCEL_TARGET" --token="$VERCEL_TOKEN"
+      - run: vercel build $VERCEL_PROD_FLAG --token="$VERCEL_TOKEN"
+      - id: deploy
+        run: echo "url=$(vercel deploy --prebuilt $VERCEL_PROD_FLAG --token="$VERCEL_TOKEN")" >> "$GITHUB_OUTPUT"
