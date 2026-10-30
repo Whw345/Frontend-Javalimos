@@ -1,41 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
-import { decideTemplate } from "./decide";
+import { decideForTopic } from "./decide";
 
 const input = {
+  topicId: "bio-101-week-03",
+  topicName: "Fase luminosa",
   markdown: "## Fotosíntesis\nLa fase luminosa produce ATP y NADPH.",
-  source: {
-    documentId: "bio-101-week-03",
-    topic: "Fotosíntesis",
-    section: "Fase luminosa",
-  },
 };
 
-describe("decideTemplate", () => {
-  it("adds source metadata to a valid model decision", async () => {
-    const complete = vi.fn().mockResolvedValue({
-      template: "multiple_choice",
-      difficulty: 2,
-      cognitiveSkill: "comprender",
-      confidence: 0.88,
-      reason: "El material presenta una relación conceptual directa.",
-    });
+const recommendations = [
+  { rank: 1, template: "multiple_choice", difficulty: 2, score: 0.88, confidenceLevel: "high", reason: "Evalúa una relación conceptual." },
+  { rank: 2, template: "matching", difficulty: 1, score: 0.8, confidenceLevel: "medium", reason: "Relaciona conceptos." },
+  { rank: 3, template: "fill_blank", difficulty: 1, score: 0.7, confidenceLevel: "medium", reason: "Contiene términos explícitos." },
+];
 
-    const result = await decideTemplate(input, { complete });
+describe("decideForTopic", () => {
+  it("returns three recommendations for the received topic", async () => {
+    const complete = vi.fn().mockResolvedValue({ recommendations });
+    const result = await decideForTopic(input, { complete });
 
-    expect(result.source).toEqual(input.source);
-    expect(result.decision.template).toBe("multiple_choice");
+    expect(result.topicId).toBe(input.topicId);
+    expect(result.recommendations).toHaveLength(3);
+    expect(result.recommendations[0]?.template).toBe("multiple_choice");
     expect(complete).toHaveBeenCalledOnce();
   });
 
-  it("rejects an invalid model decision", async () => {
-    const complete = vi.fn().mockResolvedValue({
-      template: 1,
-      difficulty: 2,
-      cognitiveSkill: "comprender",
-      confidence: 0.88,
-      reason: "Decisión inválida.",
-    });
+  it("rejects an output with fewer than three recommendations", async () => {
+    const complete = vi.fn().mockResolvedValue({ recommendations: [recommendations[0]] });
 
-    await expect(decideTemplate(input, { complete })).rejects.toThrow();
+    await expect(decideForTopic(input, { complete })).rejects.toThrow();
   });
 });

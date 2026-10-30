@@ -1,11 +1,11 @@
 import { ZodError } from "zod";
-import { decideTemplate } from "@/lib/decision/decide";
+import { decideForTopic } from "@/lib/decision/decide";
 import { getConfiguredDecisionModel, DecisionProviderConfigurationError } from "@/lib/decision/provider";
 
 export async function POST(request: Request) {
   try {
     const body: unknown = await request.json();
-    const result = await decideTemplate(body, getConfiguredDecisionModel());
+    const result = await decideForTopic(body, getConfiguredDecisionModel());
     return Response.json(result);
   } catch (error) {
     if (error instanceof ZodError) {

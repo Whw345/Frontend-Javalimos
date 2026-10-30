@@ -3,38 +3,38 @@ import { decisionResultSchema } from "./schema";
 
 const validDecision = {
   schemaVersion: "1.0",
-  source: {
-    documentId: "bioquimica-semana-03",
-    topic: "Fotosíntesis",
-    section: "Fase luminosa",
-  },
-  decision: {
-    template: "multiple_choice",
-    difficulty: 3,
-    cognitiveSkill: "aplicar",
-    confidence: 0.91,
-    reason: "El contenido permite evaluar relaciones causa-efecto.",
-  },
+  topicId: "bioquimica-semana-03",
+  recommendations: [
+    { rank: 1, template: "multiple_choice", difficulty: 2, score: 0.91, confidenceLevel: "high", reason: "Evalúa relaciones." },
+    { rank: 2, template: "matching", difficulty: 1, score: 0.8, confidenceLevel: "medium", reason: "Relaciona conceptos." },
+    { rank: 3, template: "fill_blank", difficulty: 1, score: 0.7, confidenceLevel: "medium", reason: "Evalúa términos." },
+  ],
 };
 
 describe("decisionResultSchema", () => {
-  it("accepts a valid decision", () => {
+  it("accepts three valid recommendations", () => {
     expect(decisionResultSchema.safeParse(validDecision).success).toBe(true);
   });
 
-  it("rejects an ordinal encoding for the template", () => {
+  it("rejects an ordinal encoding for a template", () => {
     const result = decisionResultSchema.safeParse({
       ...validDecision,
-      decision: { ...validDecision.decision, template: 1 },
+      recommendations: [
+        { ...validDecision.recommendations[0], template: 1 },
+        ...validDecision.recommendations.slice(1),
+      ],
     });
 
     expect(result.success).toBe(false);
   });
 
-  it("rejects a difficulty outside the 1 to 3 range", () => {
+  it("rejects a repeated template", () => {
     const result = decisionResultSchema.safeParse({
       ...validDecision,
-      decision: { ...validDecision.decision, difficulty: 4 },
+      recommendations: validDecision.recommendations.map((recommendation) => ({
+        ...recommendation,
+        template: "matching",
+      })),
     });
 
     expect(result.success).toBe(false);

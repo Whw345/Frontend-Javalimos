@@ -10,18 +10,19 @@ export type CognitiveSkill =
   | "aplicar"
   | "analizar";
 
+export type ConfidenceLevel = "low" | "medium" | "high";
+
+export type GameRecommendation = {
+  rank: 1 | 2 | 3;
+  template: Template;
+  difficulty: 1 | 2 | 3;
+  score: number;
+  confidenceLevel: ConfidenceLevel;
+  reason: string;
+};
+
 export type DecisionResult = {
   schemaVersion: "1.0";
-  source: {
-    documentId?: string;
-    topic: string;
-    section?: string;
-  };
-  decision: {
-    template: Template;
-    difficulty: 1 | 2 | 3;
-    cognitiveSkill: CognitiveSkill;
-    confidence: number;
-    reason: string;
-  };
+  topicId: string;
+  recommendations: [GameRecommendation, GameRecommendation, GameRecommendation];
 };

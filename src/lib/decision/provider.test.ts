@@ -6,13 +6,11 @@ describe("createGenericHttpDecisionModel", () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          decision: {
-            template: "matching",
-            difficulty: 2,
-            cognitiveSkill: "comprender",
-            confidence: 0.8,
-            reason: "Relaciona conceptos y definiciones.",
-          },
+          recommendations: [
+            { rank: 1, template: "matching", difficulty: 2, score: 0.8, confidenceLevel: "high", reason: "Relaciona conceptos." },
+            { rank: 2, template: "ordering", difficulty: 1, score: 0.7, confidenceLevel: "medium", reason: "Presenta una secuencia." },
+            { rank: 3, template: "fill_blank", difficulty: 1, score: 0.6, confidenceLevel: "medium", reason: "Contiene términos clave." },
+          ],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
@@ -25,15 +23,12 @@ describe("createGenericHttpDecisionModel", () => {
       fetchImpl,
     });
 
-    const result = await model.complete("Selecciona una plantilla.");
+    const result = await model.complete("Selecciona tres plantillas.");
     const request = fetchImpl.mock.calls[0]?.[1] as RequestInit;
 
-    expect(result).toEqual({
+    expect(result).toHaveProperty("recommendations");
+    expect((result as { recommendations: Array<{ template: string }> }).recommendations[0]).toMatchObject({
       template: "matching",
-      difficulty: 2,
-      cognitiveSkill: "comprender",
-      confidence: 0.8,
-      reason: "Relaciona conceptos y definiciones.",
     });
     expect(request.method).toBe("POST");
     expect(request.headers).toEqual({
@@ -42,7 +37,7 @@ describe("createGenericHttpDecisionModel", () => {
     });
     expect(JSON.parse(String(request.body))).toMatchObject({
       model: "generic-model",
-      prompt: "Selecciona una plantilla.",
+      prompt: "Selecciona tres plantillas.",
       responseFormat: "json",
       schemaVersion: "1.0",
     });
