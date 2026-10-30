@@ -27,3 +27,6 @@ pnpm-debug.log*
 # env files (se versiona solo .env.example)
 .env*
 !.env.example
+
+# Claude Code
+.claude/
