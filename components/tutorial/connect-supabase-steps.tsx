@@ -41,6 +41,16 @@ export function ConnectSupabaseSteps() {
         </p>
       </TutorialStep>
 
+      <TutorialStep title="Create the auth tables">
+        <p>
+          Run{" "}
+          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+            db/better-auth.sql
+          </span>{" "}
+          in the SQL Editor of your Supabase project.
+        </p>
+      </TutorialStep>
+
       <TutorialStep title="Restart your Next.js development server">
         <p>
           You may need to quit your Next.js development server and run{" "}

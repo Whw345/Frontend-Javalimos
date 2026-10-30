@@ -26,8 +26,7 @@
   - Client
   - Server
   - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
+- Email and password and Google authentication with [Better Auth](https://www.better-auth.com), stored in your Supabase Postgres database
 - Styling with [Tailwind CSS](https://tailwindcss.com)
 - Components with [shadcn/ui](https://ui.shadcn.com/)
 - Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
@@ -76,16 +75,38 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
 4. Rename `.env.example` to `.env.local` and update the following:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
+SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
+SUPABASE_SECRET_KEY=[INSERT SUPABASE PROJECT SECRET KEY]
+DATABASE_URL=[INSERT SUPABASE TRANSACTION POOLER STRING, ENDING IN ?sslmode=no-verify]
+BETTER_AUTH_SECRET=[INSERT THE OUTPUT OF npx auth@latest secret]
+BETTER_AUTH_URL=http://localhost:3000
+GOOGLE_CLIENT_ID=[INSERT GOOGLE OAUTH CLIENT ID]
+GOOGLE_CLIENT_SECRET=[INSERT GOOGLE OAUTH CLIENT SECRET]
 ```
 
-> [!NOTE]
-> This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-> Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-> See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+Run [`db/better-auth.sql`](db/better-auth.sql) and then [`db/app.sql`](db/app.sql) in the SQL Editor of your Supabase project to create the tables. In production, set `BETTER_AUTH_URL` to your deployed URL.
 
-Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+Create the Google credentials in the [Google Auth Platform](https://console.cloud.google.com/auth/clients) as a **Web application** client, with `http://localhost:3000/api/auth/callback/google` and `https://your-domain.com/api/auth/callback/google` as authorized redirect URIs.
+
+> [!NOTE]
+> The frontend never connects to the database. Pages and components call the functions in `lib/data` (such as `listMyCourses()`), and ESLint rejects direct imports of the database client. Each file in `lib/data` covers one domain, checks the session, filters by the current user, and returns plain domain types, so only that folder knows about the engine. Because the client uses the secret key and bypasses RLS, every table you create needs `grant select, insert, update, delete` to `service_role` and RLS enabled with no policies, so the Data API stays closed to anyone holding only the publishable key.
+
+Every sign-up becomes a student. Organizations are created in the SQL Editor, which stores only the hash of the API key. Generate the key with `npx auth@latest secret`:
+
+```sql
+insert into organization (name, api_key_hash)
+values ('Your organization', encode(sha256(convert_to('YOUR API KEY', 'UTF8')), 'hex'));
+```
+
+To make an existing user a teacher of that organization, or to change their course limit, call the endpoint with its API key:
+
+```bash
+curl -X POST http://localhost:3000/api/teachers -H "x-api-key: $ORGANIZATION_API_KEY" -H "content-type: application/json" -d '{"email":"teacher@example.com","courseLimit":5}'
+```
+
+Teachers add students to their courses by email with `inviteStudentToMyCourse()`. The student must already have an account. Deleting an organization also deletes its teachers, their courses, those courses' games and enrollments, but not the users or their student rows.
+
+Both `SUPABASE_URL` and `SUPABASE_SECRET_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
 
 5. You can now run the Next.js local development server:
 
