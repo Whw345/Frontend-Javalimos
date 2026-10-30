@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend-Javalimos
 
-## Getting Started
+Frontend del sistema de aprendizaje para hackatón de DSC: minijuegos semanales generados desde los PDFs del curso, con leaderboard por sección y práctica sin IA.
 
-First, run the development server:
+Sigue `FRONTEND_DESIGN_SYSTEM.md` (tokens, `GameShell`, contrato de minijuegos). Este repo es **solo frontend**: mientras no exista el backend de Spring, la API se simula en el navegador con MSW (`src/mocks/`), que arma los retos desde átomos de ejemplo y califica del lado "servidor" (el cliente nunca recibe la solución antes de responder).
+
+## Empezar
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+corepack pnpm install
+corepack pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre http://localhost:3000 → selector de retos del curso de demo.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Script           | Qué hace                                            |
+| ---------------- | --------------------------------------------------- |
+| `pnpm dev`       | Servidor de desarrollo                              |
+| `pnpm build`     | Build de producción                                 |
+| `pnpm typecheck` | TypeScript (`strict`)                               |
+| `pnpm lint`      | ESLint                                              |
+| `pnpm test`      | Tests unitarios (Vitest) de la lógica de cada juego |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Variables en `.env.example` (los mocks están activos salvo `NEXT_PUBLIC_API_MOCKING=disabled`).
 
-## Learn More
+## Juegos implementados
 
-To learn more about Next.js, take a look at the following resources:
+Los 10 de la tabla de plantillas, cada uno con su `README.md`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| #   | Juego                  | Carpeta                     |
+| --- | ---------------------- | --------------------------- |
+| 1   | Desliza                | `src/games/desliza`         |
+| 2   | Parejas                | `src/games/parejas`         |
+| 3   | Ordena                 | `src/games/ordena`          |
+| 4   | Dos cajas              | `src/games/dos-cajas`       |
+| 5   | Hueco                  | `src/games/hueco`           |
+| 6   | Encuentra el error     | `src/games/encuentra-error` |
+| 7   | ¿Quién soy?            | `src/games/quien-soy`       |
+| 8   | El intruso             | `src/games/intruso`         |
+| 9   | ¿Cuál es mayor?        | `src/games/cual-mayor`      |
+| 10  | Explícalo en una frase | `src/games/explicalo`       |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Para cambiar o agregar un juego: crea `src/games/<slug>/` con `index.ts` (`GameDefinition`), componente, `schema.ts`, `logic.ts` + tests, `fixtures.ts` y `README.md`; regístralo en `src/games/registry.ts` y agrega su generador en `src/mocks/db.ts`.
 
-## Deploy on Vercel
+## Estructura
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── app/                 rutas (selector, reto, resultado)
+├── components/ui/       UI kit base
+├── components/game/     GameShell, GameTimer, FeedbackSheet, GameTile…
+├── components/gamification/
+├── games/               un folder por juego + registry
+├── lib/api/             cliente, esquemas zod del contrato, hooks de TanStack Query
+├── lib/hooks/           useCountdown, useGameHotkeys, useVisibilityGuard
+├── stores/              store de sesión (Zustand, uno por reto)
+├── content/copy.ts      microcopy
+├── styles/tokens.css    design tokens (Tailwind v4)
+└── mocks/               backend simulado (MSW)
+```
