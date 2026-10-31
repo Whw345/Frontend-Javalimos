@@ -54,6 +54,15 @@ export async function requireCourse(courseId: string, teacherOnly = false) {
   if (!data || (teacherOnly && data.role !== "teacher")) {
     throw new HttpError(403, "FORBIDDEN", "No tienes permiso para acceder a este curso.");
   }
+  const course = await getDatabase()
+    .from("courses")
+    .select("archived_at")
+    .eq("id", courseId)
+    .maybeSingle();
+  if (course.error) throw course.error;
+  if (!course.data || course.data.archived_at) {
+    throw new HttpError(404, "NOT_FOUND", "No se encontró el curso solicitado.");
+  }
   return { userId, role: data.role as string, section: data.section as string };
 }
 

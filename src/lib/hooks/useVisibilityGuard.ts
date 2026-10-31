@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ENABLE_TAB_GUARD } from "@/lib/config";
 
 interface VisibilityGuardOptions {
   enabled: boolean;
-  /** Solo se llama si el feature flag ENABLE_TAB_GUARD está activo. */
   onLeave?: () => void;
 }
 
 /**
- * §13: detecta cuando el estudiante sale de la pestaña durante un reto.
- * En v1 (flag apagado) solo registra el evento para analítica.
+ * Detecta cuando el estudiante sale de la pestaña durante un reto.
+ * La acción se ejecuta una sola vez por evento de salida; el componente decide
+ * si eso significa fallar la pregunta o avanzar la ronda.
  */
 export function useVisibilityGuard({ enabled, onLeave }: VisibilityGuardOptions): void {
   const onLeaveRef = useRef(onLeave);
@@ -22,23 +21,31 @@ export function useVisibilityGuard({ enabled, onLeave }: VisibilityGuardOptions)
 
   useEffect(() => {
     if (!enabled) return;
+    const away = { current: false };
 
     const handleLeave = (reason: "hidden" | "blur") => {
-      // TODO(analítica): reemplazar por el cliente de eventos cuando exista.
+      if (away.current) return;
+      away.current = true;
       console.info("[visibility-guard]", reason, new Date().toISOString());
-      if (ENABLE_TAB_GUARD) onLeaveRef.current?.();
+      onLeaveRef.current?.();
     };
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") handleLeave("hidden");
+      else away.current = false;
     };
     const onBlur = () => handleLeave("blur");
+    const onFocus = () => {
+      away.current = false;
+    };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
     };
   }, [enabled]);
 }

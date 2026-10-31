@@ -1,18 +1,19 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Plus } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Archive, BookOpen, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { CuyFrontal } from "@/components/brand/CuyFrontal";
 import { Button } from "@/components/ui/Button";
 import { cardVariants } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { copy } from "@/content/copy";
 import { ApiError } from "@/lib/api/client";
-import { getCourses, type CourseCard } from "@/lib/api/teacher";
+import { archiveCourse, getCourses, type CourseCard } from "@/lib/api/teacher";
 import { cn } from "@/lib/utils/cn";
 import { TeacherHeader } from "./TeacherHeader";
 
@@ -29,6 +30,8 @@ function courseState(course: CourseCard) {
 
 export function CourseList() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [courseToArchive, setCourseToArchive] = useState<CourseCard | null>(null);
   const courses = useQuery({
     queryKey: ["teacher", "courses"],
     queryFn: getCourses,
@@ -36,6 +39,13 @@ export function CourseList() {
     retry: false,
   });
   const unauthorized = courses.error instanceof ApiError && courses.error.status === 401;
+  const archive = useMutation({
+    mutationFn: (course: CourseCard) => archiveCourse(course.id),
+    onSuccess: async () => {
+      setCourseToArchive(null);
+      await queryClient.invalidateQueries({ queryKey: ["teacher", "courses"] });
+    },
+  });
   useEffect(() => {
     if (unauthorized) router.replace("/ingresar");
   }, [unauthorized, router]);
@@ -86,26 +96,42 @@ export function CourseList() {
               ))}
             {courses.data?.courses.map((course) => (
               <li key={course.id}>
-                <Link
-                  href={courseHref(course)}
+                <article
                   className={cn(
                     cardVariants({ interactive: true }),
-                    "flex h-full min-h-44 flex-col gap-3 focus-visible:shadow-glow-primary",
+                    "relative h-full min-h-44 focus-within:shadow-glow-primary",
                   )}
                 >
-                  <span className="flex size-12 items-center justify-center rounded-md bg-primary-soft text-primary-text">
-                    <BookOpen aria-hidden className="size-6" />
-                  </span>
-                  <span className="type-h3 text-text">{course.name}</span>
-                  <span className="mt-auto flex items-center justify-between gap-2">
-                    <span className="type-caption text-text-secondary">
-                      {t.summary(course.weeks, course.games)}
+                  <Link
+                    href={courseHref(course)}
+                    className="flex h-full flex-col gap-3 rounded-[inherit] p-5 pr-14 focus-visible:outline-none"
+                  >
+                    <span className="flex size-12 items-center justify-center rounded-md bg-primary-soft text-primary-text">
+                      <BookOpen aria-hidden className="size-6" />
                     </span>
-                    <span className="rounded-sm bg-surface-raised px-2 py-1 type-caption text-text-secondary">
-                      {courseState(course)}
+                    <span className="type-h3 text-text">{course.name}</span>
+                    <span className="mt-auto flex items-center justify-between gap-2">
+                      <span className="type-caption text-text-secondary">
+                        {t.summary(course.weeks, course.games)}
+                      </span>
+                      <span className="rounded-sm bg-surface-raised px-2 py-1 type-caption text-text-secondary">
+                        {courseState(course)}
+                      </span>
                     </span>
-                  </span>
-                </Link>
+                  </Link>
+                  {course.role === "teacher" && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-3 right-3"
+                      aria-label={t.archive}
+                      onClick={() => setCourseToArchive(course)}
+                    >
+                      <Archive aria-hidden className="size-4" />
+                    </Button>
+                  )}
+                </article>
               </li>
             ))}
           </ul>
@@ -116,6 +142,23 @@ export function CourseList() {
             <p className="type-body">{courses.data.canCreateCourses ? t.createHint : t.noCourses}</p>
           </div>
         )}
+        <ConfirmDialog
+          open={courseToArchive !== null}
+          onOpenChange={(open) => {
+            if (!open && !archive.isPending) setCourseToArchive(null);
+          }}
+          title={t.archiveTitle}
+          description={
+            courseToArchive
+              ? `${t.archiveDescription} (${courseToArchive.name})`
+              : t.archiveDescription
+          }
+          confirmLabel={t.archiveConfirm}
+          cancelLabel={t.archiveCancel}
+          onConfirm={() => {
+            if (courseToArchive) archive.mutate(courseToArchive);
+          }}
+        />
       </div>
     </div>
   );

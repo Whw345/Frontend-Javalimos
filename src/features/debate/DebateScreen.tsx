@@ -249,10 +249,14 @@ function ActiveDebate({ session, initialMode }: { session: DebateSession; initia
       if (document.visibilityState !== "hidden") return;
       stopDictation();
       reportEvent("tab_hidden");
+      // Salir de la pestaña equivale a pasar la pregunta actual sin puntos.
+      if (stateRef.current.phase === "answering" && !closingRef.current) {
+        void sendTurn("pass", true);
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [reportEvent, stopDictation]);
+  }, [reportEvent, sendTurn, stopDictation]);
 
   const onPasteBlocked = () => {
     dispatch({ type: "pasteBlocked" });

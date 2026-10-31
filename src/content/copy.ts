@@ -172,6 +172,12 @@ export const copy = {
       inSetup: "En preparación",
       ready: "Listo",
       student: "Estudiante",
+        archive: "Archivar curso",
+        archiveTitle: "¿Archivar este curso?",
+        archiveDescription:
+          "El curso dejará de aparecer para docentes y estudiantes, pero sus datos se conservarán.",
+        archiveConfirm: "Archivar",
+        archiveCancel: "Cancelar",
       summary: (weeks: number, games: number) =>
         `${weeks} ${weeks === 1 ? "semana" : "semanas"} · ${games} ${games === 1 ? "juego" : "juegos"}`,
       loadFailed: "No pudimos cargar tus cursos.",

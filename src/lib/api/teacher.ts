@@ -88,6 +88,13 @@ export const getCourses = () =>
 export const createCourse = (name: string) =>
   teacherRequest("/api/courses", z.object({ id: z.string() }), json("POST", { name }));
 
+export const archiveCourse = (courseId: string) =>
+  teacherRequest(
+    coursePath(courseId),
+    z.object({ id: z.string(), archived: z.literal(true) }),
+    { method: "DELETE" },
+  );
+
 export function uploadPdf(courseId: string, file: File, week: number) {
   const form = new FormData();
   form.set("kind", "theory");

@@ -5,7 +5,6 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 export const API_MOCKING_ENABLED = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
 
 /** §13: bloqueo por cambio de pestaña. Preparado pero apagado en v1. */
-export const ENABLE_TAB_GUARD = process.env.NEXT_PUBLIC_ENABLE_TAB_GUARD === "true";
 
 /** El Debate puede adjuntar audio además del texto dictado. Desactivado por defecto. */
 export const DEBATE_SEND_AUDIO = process.env.NEXT_PUBLIC_DEBATE_SEND_AUDIO === "true";

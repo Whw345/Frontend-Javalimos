@@ -21,7 +21,11 @@ export async function listCourses(userId: string) {
   const canCreateCourses = await isTeacher(userId);
   if (!ids.length) return { canCreateCourses, courses: [] };
   const courses = checked(
-    await db.from("courses").select("id, name, created_at, setup_completed_at").in("id", ids),
+    await db
+      .from("courses")
+      .select("id, name, created_at, setup_completed_at")
+      .in("id", ids)
+      .is("archived_at", null),
   );
   const weeks = checked(await db.from("course_weeks").select("course_id").in("course_id", ids));
   const games = checked(
@@ -63,10 +67,29 @@ export async function createCourse(userId: string, input: unknown) {
   return { id };
 }
 
+/** Archivar conserva el curso y todos sus datos; nunca se elimina físicamente. */
+export async function archiveCourse(courseId: string, userId: string) {
+  const result = await getDatabase()
+    .from("courses")
+    .update({ archived_at: new Date().toISOString(), archived_by: userId })
+    .eq("id", courseId)
+    .is("archived_at", null)
+    .select("id")
+    .maybeSingle();
+  if (result.error) throw result.error;
+  if (!result.data) throw new HttpError(404, "NOT_FOUND", "El curso ya no está activo.");
+  return { id: result.data.id as string, archived: true, archivedBy: userId };
+}
+
 export async function getCoursePath(courseId: string) {
   const db = getDatabase();
   const course = checked(
-    await db.from("courses").select("id, name, starts_on, setup_completed_at").eq("id", courseId).single(),
+    await db
+      .from("courses")
+      .select("id, name, starts_on, setup_completed_at")
+      .eq("id", courseId)
+      .is("archived_at", null)
+      .single(),
   );
   const weeks = checked(
     await db
