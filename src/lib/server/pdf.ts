@@ -24,15 +24,18 @@ export async function extractPdf(file: File): Promise<string> {
   try {
     const path = join(directory, "document.pdf");
     await writeFile(path, buffer);
+    // Must load before pdf-parse: serverless runtimes have neither DOMMatrix nor a traced worker.
+    const { CanvasFactory, getPath } = await import("pdf-parse/worker");
     const [{ default: Markitdown, DocumentConverter }, { PDFParse }] = await Promise.all([
       import("markitdown-js"),
       import("pdf-parse"),
     ]);
+    PDFParse.setWorker(getPath());
     // The bundled PDF.js 1.x parser fails on valid PDFKit files in Node 22.
     // Use MarkItDown's public converter extension API with the maintained parser.
     class NodePdfConverter extends DocumentConverter {
       async convert(localPath: string) {
-        const parser = new PDFParse({ data: await readFile(localPath) });
+        const parser = new PDFParse({ data: await readFile(localPath), CanvasFactory });
         try {
           const text = await parser.getText();
           return { title: null, textContent: text.pages.map((page) => page.text).join("\n\n") };
@@ -56,6 +59,8 @@ export async function extractPdf(file: File): Promise<string> {
     return markdown;
   } catch (error) {
     if (error instanceof HttpError) throw error;
+    // Parser errors describe the failure, never the document's text.
+    console.error("PDF extraction failed:", error instanceof Error ? error.message : "UnknownError");
     throw new HttpError(
       422,
       "PDF_EXTRACTION_FAILED",
