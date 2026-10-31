@@ -2,6 +2,9 @@
  * Microcopy de la app (§15). Ningún texto visible se escribe suelto en componentes.
  * Tono: compañero de estudio, tuteo, oraciones cortas.
  */
+const LEVEL_NAMES = ["Fácil", "Medio", "Difícil"];
+const levelName = (level: number) => LEVEL_NAMES[level - 1] ?? LEVEL_NAMES[0]!;
+
 export const copy = {
   common: {
     loadingChallenge: "Preparando tu reto…",
@@ -23,7 +26,7 @@ export const copy = {
       confirm: "Salir",
       cancel: "Seguir jugando",
     },
-    meta: (week: number, level: number) => `Semana ${week} · Nivel ${level}`,
+    meta: (week: number, level: number) => `Semana ${week} · ${levelName(level)}`,
     gameArea: "Área de juego",
     submit: "Comprobar",
     submitting: "Enviando…",
@@ -78,7 +81,7 @@ export const copy = {
     title: "Elige tu reto",
     subtitle: "Responde solo con lo que sabes. La IA se apaga durante el reto.",
     level: "Nivel",
-    levelOption: (level: number) => `Nivel ${level}`,
+    levelOption: levelName,
     play: "Jugar",
     weeklyQuota: (played: number, limit: number) => `${played} de ${limit} retos esta semana`,
     weeklyLimitReached: "Vuelve el lunes",
@@ -181,13 +184,13 @@ export const copy = {
       retry: "Generar de nuevo",
       waiting: "En cola…",
       editGame: (name: string, week: number) => `Editar ${name}, semana ${week}`,
-      level: (level: number) => `Nivel ${level}`,
+      level: levelName,
       finish: "Terminar",
       loadFailed: "No pudimos cargar este curso.",
     },
     editor: {
       title: (name: string) => `Editar ${name}`,
-      meta: (week: number, level: number) => `Semana ${week} · Nivel ${level}`,
+      meta: (week: number, level: number) => `Semana ${week} · ${levelName(level)}`,
       evidence: "Fuente",
       add: "Agregar",
       remove: "Quitar",

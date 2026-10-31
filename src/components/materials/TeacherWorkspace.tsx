@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { copy } from "@/content/copy";
 import styles from "./Workspace.module.css";
 
 type Week = { weekNumber: number; topic: string; startsOn: string | null };
@@ -299,7 +300,8 @@ export function TeacherWorkspace({ courseId }: { courseId: string }) {
               {data.challenges.map((challenge) => (
                 <article key={challenge.id}>
                   <h3>
-                    Semana {challenge.week_number} · {challenge.game} · Nivel {challenge.difficulty} ·{" "}
+                    Semana {challenge.week_number} · {challenge.game} ·{" "}
+                    {copy.picker.levelOption(challenge.difficulty)} ·{" "}
                     {{ draft: "Borrador", published: "Publicado", discarded: "Descartado" }[challenge.status]}
                   </h3>
                   <details>

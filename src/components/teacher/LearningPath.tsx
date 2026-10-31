@@ -15,7 +15,8 @@ import { ApiError } from "@/lib/api/client";
 import { finishCourse, generateWeek, getCoursePath, type PathWeek } from "@/lib/api/teacher";
 import { cn } from "@/lib/utils/cn";
 import { formatDeadline } from "@/lib/utils/schedule";
-import { CURVE, nodeAccents, pathOffsets } from "@/components/game/pathStyle";
+import { nodeAccents } from "@/components/game/pathStyle";
+import { SinePath } from "@/components/game/SinePath";
 import { CourseUpload } from "./CourseUpload";
 import { GameEditor } from "./GameEditor";
 import { TeacherHeader } from "./TeacherHeader";
@@ -30,13 +31,11 @@ const busy = (week: PathWeek) => week.generationStatus === "pending" || week.gen
 
 function WeekPath({
   week,
-  offset,
   onEdit,
   onRetry,
   retrying,
 }: {
   week: PathWeek;
-  offset: number;
   onEdit: (gameId: string) => void;
   onRetry?: () => void;
   retrying: boolean;
@@ -44,27 +43,26 @@ function WeekPath({
   const failed = week.generationStatus === "failed";
   const empty = week.generationStatus === "done" && week.games.length === 0;
   return (
-    <section aria-label={t.week(week.weekNumber)} className="flex flex-col items-center gap-8">
+    <section aria-label={t.week(week.weekNumber)} className="flex flex-col gap-6">
       <div className="w-full rounded-lg bg-(image:--gradient-dusk) p-4 text-text-on-primary">
         <p className="type-overline">{t.week(week.weekNumber)}</p>
         <h2 className="type-h3">{week.topic}</h2>
         {week.deadline && <p className="type-caption">{t.deadline(formatDeadline(week.deadline))}</p>}
       </div>
       {busy(week) && (
-        <ul aria-label={t.waiting} className="flex flex-col items-center gap-6">
-          {[0, 1, 2].map((index) => (
-            <li
-              key={index}
-              style={{ transform: `translateX(${CURVE[(offset + index) % CURVE.length]}px)` }}
-              className="flex size-18 animate-pulse items-center justify-center rounded-full bg-surface-raised text-text-muted shadow-[0_6px_0_var(--color-border)]"
-            >
+        <SinePath
+          items={[0, 1, 2]}
+          getKey={(index) => index}
+          label={t.waiting}
+          renderNode={() => (
+            <div className="flex size-18 animate-pulse items-center justify-center rounded-full bg-surface-raised text-text-muted shadow-[0_6px_0_var(--color-border)]">
               <Lock aria-hidden className="size-6" />
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
       )}
       {(failed || empty) && (
-        <div role="status" className="flex flex-col items-center gap-3 text-center">
+        <div role="status" className="flex flex-col items-start gap-3">
           <p className="type-body text-text-secondary">
             {failed ? (week.generationError ?? t.failed) : t.noGames}
           </p>
@@ -77,17 +75,15 @@ function WeekPath({
         </div>
       )}
       {week.games.length > 0 && !busy(week) && (
-        <ul className="flex flex-col items-center gap-6">
-          {week.games.map((game, index) => {
+        <SinePath
+          items={week.games}
+          getKey={(game) => game.id}
+          renderNode={(game) => {
             const definition = getGameDefinition(game.game);
             if (!definition) return null;
             const Icon = definition.icon;
             return (
-              <li
-                key={game.id}
-                style={{ transform: `translateX(${CURVE[(offset + index) % CURVE.length]}px)` }}
-                className="flex flex-col items-center gap-3"
-              >
+              <>
                 <button
                   type="button"
                   aria-label={t.editGame(definition.name, week.weekNumber)}
@@ -100,14 +96,14 @@ function WeekPath({
                 >
                   <Icon aria-hidden className="size-8" />
                 </button>
-                <span className="max-w-32 text-center type-caption text-text-secondary">
+                <span className="w-full text-center type-caption text-text-secondary">
                   {definition.name}
                   <span className="block text-text-muted">{t.level(game.difficulty)}</span>
                 </span>
-              </li>
+              </>
             );
-          })}
-        </ul>
+          }}
+        />
       )}
     </section>
   );
@@ -193,10 +189,9 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
   const finished = weeks?.filter((week) => !busy(week)).length ?? 0;
   const generating = finished < total;
   const hasGames = weeks?.some((week) => week.games.length > 0);
-  const offsets = pathOffsets((weeks ?? []).map((week) => week.games.length));
   return (
     <div className={cn(!embedded && "min-h-dvh bg-bg px-4 pt-6 md:px-6", !setupCompleted && "pb-28")}>
-      <div className="mx-auto flex max-w-xl flex-col gap-8">
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-8">
         {!embedded && <TeacherHeader />}
         {path.isPending && <Skeleton className="h-96" />}
         {path.isError && !unauthorized && (
@@ -221,11 +216,10 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
               </div>
             </div>
             <div className="flex flex-col gap-12">
-              {path.data.weeks.map((week, index) => (
+              {path.data.weeks.map((week) => (
                 <WeekPath
                   key={week.weekNumber}
                   week={week}
-                  offset={offsets[index]!}
                   onEdit={setEditing}
                   onRetry={setupCompleted ? undefined : () => retry(week.weekNumber)}
                   retrying={retrying === week.weekNumber}
@@ -237,7 +231,7 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
       </div>
       {path.data && !setupCompleted && (
         <div className="fixed inset-x-0 bottom-0 z-(--z-sticky) border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-xl flex-col items-center gap-2">
+          <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-2">
             {finish.isError && (
               <p role="alert" className="type-caption text-error">
                 {finish.error.message}

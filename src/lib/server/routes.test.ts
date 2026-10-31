@@ -174,7 +174,7 @@ it("runs real upload routes through PDF extraction, week confirmation, SQL persi
     pointsAwarded: 5,
     timedOut: false,
     source: { documento: "teoria.pdf" },
-    totals: { points: 5, weeklyPlayed: 1, weeklyLimit: 10 },
+    totals: { points: 5, weeklyPlayed: 1, weeklyLimit: 1 },
   });
   expect(
     (
@@ -606,7 +606,11 @@ it("lets an assigned student play only the current week, from before the first M
     request("answer", "POST", { answer: { optionId: "a" } }),
     sessionContext(session.sessionId),
   );
-  expect(await answered.json()).toMatchObject({ correct: true, pointsAwarded: 10 });
+  expect(await answered.json()).toMatchObject({
+    correct: true,
+    pointsAwarded: 10,
+    totals: { weeklyPlayed: 1, weeklyLimit: 1 },
+  });
   expect((await (await list()).json()).weeks[0].games).toMatchObject([
     { id: week1, status: "played", points: 10 },
   ]);

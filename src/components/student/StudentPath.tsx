@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CuyFrontal } from "@/components/brand/CuyFrontal";
-import { CURVE, pathOffsets } from "@/components/game/pathStyle";
+import { SinePath } from "@/components/game/SinePath";
 import { PointsCounter } from "@/components/gamification/PointsCounter";
 import { StreakBadge } from "@/components/gamification/StreakBadge";
 import { WeeklyQuota } from "@/components/gamification/WeeklyQuota";
@@ -67,7 +67,6 @@ export function StudentPath({ courseId }: { courseId: string }) {
   }, [unauthorized, router]);
 
   const weeks = path.data?.weeks ?? [];
-  const offsets = pathOffsets(weeks.map((week) => week.games.length + week.hiddenGames));
   const currentGames = weeks.find((week) => week.state === "current")?.games ?? [];
   const pending = currentGames.some((game) => game.status === "available");
   const limitReached = progress.data ? progress.data.weeklyPlayed >= progress.data.weeklyLimit : false;
@@ -84,13 +83,13 @@ export function StudentPath({ courseId }: { courseId: string }) {
     );
 
   return (
-    <div className="min-h-dvh bg-(image:--gradient-night) px-4 py-8 md:px-6 lg:py-12">
-      <main className="mx-auto flex w-full max-w-xl flex-col gap-8">
+    <div className="min-h-dvh bg-(image:--gradient-night) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
+      <main className="mx-auto flex w-full max-w-300 flex-col gap-8">
         <Link href="/cursos" className={buttonVariants({ variant: "secondary", className: "self-start" })}>
           {copy.teacher.backToCourses}
         </Link>
 
-        <header className="flex flex-col gap-6">
+        <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-col gap-2">
             <p className="type-overline text-reward">
               {path.data ? t.week(path.data.course.current_week) : copy.picker.overline}
@@ -98,14 +97,16 @@ export function StudentPath({ courseId }: { courseId: string }) {
             <h1 className="type-h1 text-text">{path.data?.course.name ?? copy.picker.title}</h1>
             <p className="max-w-prose type-body text-text-secondary">{copy.picker.subtitle}</p>
           </div>
-          <Card className="flex flex-col gap-3">
+          <Card className="flex w-full flex-col gap-3 lg:w-80">
             {progress.data ? (
               <>
                 <div className="flex items-center gap-3">
                   <PointsCounter points={progress.data.points} />
                   <StreakBadge streakDays={progress.data.streakDays} />
                 </div>
-                <WeeklyQuota played={progress.data.weeklyPlayed} limit={progress.data.weeklyLimit} />
+                {progress.data.weeklyLimit > 0 && (
+                  <WeeklyQuota played={progress.data.weeklyPlayed} limit={progress.data.weeklyLimit} />
+                )}
               </>
             ) : (
               <Skeleton className="h-16 w-full" />
@@ -140,40 +141,48 @@ export function StudentPath({ courseId }: { courseId: string }) {
         )}
 
         <div className="flex flex-col gap-12">
-          {weeks.map((week, weekIndex) => (
+          {weeks.map((week) => (
             <section
               key={week.weekNumber}
               aria-label={t.week(week.weekNumber)}
-              className="flex flex-col items-center gap-8"
+              className="flex flex-col gap-6"
             >
               <WeekBanner week={week} />
-              <ul className="flex flex-col items-center gap-6">
-                {week.games.map((game, index) => (
-                  <PathGameNode
-                    key={game.id}
-                    game={game}
-                    weekNumber={week.weekNumber}
-                    curve={CURVE[(offsets[weekIndex]! + index) % CURVE.length]!}
-                    open={openGame === game.id}
-                    limitReached={limitReached}
-                    disabled={busy}
-                    loading={busy && createChallenge.variables?.challengeId === game.id}
-                    onOpen={() => setOpenGame(game.id)}
-                    onClose={() => setOpenGame((current) => (current === game.id ? null : current))}
-                    onPlay={() => play(game)}
-                  />
-                ))}
-                {Array.from({ length: week.hiddenGames }, (_, index) => (
-                  <li
-                    key={index}
-                    aria-label={t.locked}
-                    style={{ transform: `translateX(${CURVE[(offsets[weekIndex]! + index) % CURVE.length]}px)` }}
-                    className="flex size-18 items-center justify-center rounded-full bg-surface-raised text-text-muted opacity-60 shadow-[0_6px_0_var(--color-border)]"
-                  >
-                    <Lock aria-hidden className="size-6" />
-                  </li>
-                ))}
-              </ul>
+              {week.games.length > 0 && (
+                <SinePath
+                  items={week.games}
+                  getKey={(game) => game.id}
+                  renderNode={(game, slot) => (
+                    <PathGameNode
+                      game={game}
+                      weekNumber={week.weekNumber}
+                      slot={slot}
+                      open={openGame === game.id}
+                      limitReached={limitReached}
+                      disabled={busy}
+                      loading={busy && createChallenge.variables?.challengeId === game.id}
+                      onOpen={() => setOpenGame(game.id)}
+                      onClose={() => setOpenGame((current) => (current === game.id ? null : current))}
+                      onPlay={() => play(game)}
+                    />
+                  )}
+                />
+              )}
+              {week.hiddenGames > 0 && (
+                <SinePath
+                  items={Array.from({ length: week.hiddenGames }, (_, index) => index)}
+                  getKey={(index) => index}
+                  renderNode={() => (
+                    <div
+                      role="img"
+                      aria-label={t.locked}
+                      className="flex size-18 items-center justify-center rounded-full bg-surface-raised text-text-muted opacity-60 shadow-[0_6px_0_var(--color-border)]"
+                    >
+                      <Lock aria-hidden className="size-6" />
+                    </div>
+                  )}
+                />
+              )}
             </section>
           ))}
         </div>

@@ -176,7 +176,10 @@ test("a teacher signs in, creates a course from PDFs, edits the path and finishe
 
   for (const width of [360, 768, 1280]) {
     await page.setViewportSize({ width, height: 720 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    // El camino se recoloca al medir su nuevo ancho.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
   }
   await page.getByRole("button", { name: "Terminar" }).click();
   await expect(page).toHaveURL(new RegExp(`/docente/${courseId}$`));
@@ -388,7 +391,7 @@ test("a published challenge renders the existing Hueco GameShell and submits for
     deadline: new Date(Date.now() + 20_000).toISOString(),
     serverTime: new Date().toISOString(),
   });
-  const totals = { points: 0, streakDays: 0, weeklyPlayed: 1, weeklyLimit: 10 };
+  const totals = { points: 0, streakDays: 0, weeklyPlayed: 1, weeklyLimit: 2 };
   await page.route(`**/api/courses/${courseId}/challenges`, (route) =>
     route.fulfill({
       json:
@@ -455,6 +458,12 @@ test("a published challenge renders the existing Hueco GameShell and submits for
   await expect(page.getByText("Abre lun 16 nov, 00:00")).toBeVisible();
   await expect(page.getByLabel("Reto oculto hasta que abra su semana")).toHaveCount(2);
   await expect(page.getByText("Jugado · +7 pts").first()).toBeVisible();
+  await expect(page.getByText("Fácil").first()).toBeVisible();
+  await expect(page.getByText("1 de 2 retos esta semana")).toBeVisible();
+  const hueco = await page.getByRole("button", { name: "Hueco, semana 2" }).boundingBox();
+  const parejas = await page.getByRole("button", { name: "Parejas, semana 2" }).boundingBox();
+  expect(parejas!.x).toBeGreaterThan(hueco!.x);
+  expect(parejas!.y).toBeGreaterThan(hueco!.y);
   await page.screenshot({ path: "test-results/camino-estudiante.png", fullPage: true });
 
   for (const width of [320, 360, 768, 1280]) {
