@@ -10,6 +10,7 @@ import { PointsCounter } from "@/components/gamification/PointsCounter";
 import { StreakBadge } from "@/components/gamification/StreakBadge";
 import { WeeklyQuota } from "@/components/gamification/WeeklyQuota";
 import { TutorialFlow } from "@/components/tutorial/TutorialFlow";
+import { DebatePremiumCard } from "@/features/debate/DebatePremiumCard";
 import { Button, buttonVariants } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -121,6 +122,8 @@ export function StudentPath({ courseId }: { courseId: string }) {
             )}
           </Card>
         </header>
+
+        <DebatePremiumCard courseId={courseId} />
 
         {createChallenge.isError && (
           <p role="alert" className="type-body text-text-secondary">

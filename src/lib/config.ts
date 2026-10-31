@@ -7,6 +7,9 @@ export const API_MOCKING_ENABLED = process.env.NEXT_PUBLIC_API_MOCKING === "enab
 /** §13: bloqueo por cambio de pestaña. Preparado pero apagado en v1. */
 export const ENABLE_TAB_GUARD = process.env.NEXT_PUBLIC_ENABLE_TAB_GUARD === "true";
 
+/** El Debate puede adjuntar audio además del texto dictado. Desactivado por defecto. */
+export const DEBATE_SEND_AUDIO = process.env.NEXT_PUBLIC_DEBATE_SEND_AUDIO === "true";
+
 /** Curso al que lleva la raíz mientras no exista /inicio. */
 export const DEFAULT_COURSE_ID = process.env.NEXT_PUBLIC_DEFAULT_COURSE_ID ?? "bio-101";
 
