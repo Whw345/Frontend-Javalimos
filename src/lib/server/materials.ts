@@ -64,14 +64,18 @@ export async function uploadMaterial(
   const id = crypto.randomUUID();
   try {
     checked(
-      await db.from("course_documents").insert({
-        id,
-        course_id: courseId,
-        uploaded_by: userId,
-        kind,
-        filename: file.name.slice(0, 200),
-        markdown,
-      }),
+      await db
+        .from("course_documents")
+        .insert({
+          id,
+          course_id: courseId,
+          uploaded_by: userId,
+          kind,
+          filename: file.name.slice(0, 200),
+          markdown,
+        })
+        .select("id")
+        .single(),
     );
     if (weekNumber !== undefined) {
       checked(
