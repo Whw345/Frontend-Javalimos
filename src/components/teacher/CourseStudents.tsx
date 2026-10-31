@@ -1,23 +1,31 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { CuyFrontal } from "@/components/brand/CuyFrontal";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Textarea } from "@/components/ui/Textarea";
 import { copy } from "@/content/copy";
-import { assignStudents, getStudents, removeStudent } from "@/lib/api/teacher";
+import {
+  assignStudents,
+  getStudents,
+  removeStudent,
+  resetStudentProgress,
+  type CourseStudent,
+} from "@/lib/api/teacher";
 
 const t = copy.teacher.admin.students;
 
 export function CourseStudents({ courseId }: { courseId: string }) {
   const queryClient = useQueryClient();
   const [emails, setEmails] = useState("");
+  const [resetting, setResetting] = useState<CourseStudent | null>(null);
   const students = useQuery({
     queryKey: ["teacher", "students", courseId],
     queryFn: () => getStudents(courseId),
@@ -42,6 +50,10 @@ export function CourseStudents({ courseId }: { courseId: string }) {
   });
   const remove = useMutation({
     mutationFn: (email: string) => removeStudent(courseId, email),
+    onSuccess: refresh,
+  });
+  const reset = useMutation({
+    mutationFn: (student: CourseStudent) => resetStudentProgress(courseId, student.email),
     onSuccess: refresh,
   });
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -115,6 +127,17 @@ export function CourseStudents({ courseId }: { courseId: string }) {
                       {t.pending}
                     </span>
                   )}
+                  {!student.pending && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t.reset(student.email)}
+                      disabled={reset.isPending}
+                      onClick={() => setResetting(student)}
+                    >
+                      <RotateCcw aria-hidden />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -134,7 +157,28 @@ export function CourseStudents({ courseId }: { courseId: string }) {
             {remove.error.message}
           </p>
         )}
+        <div role="status" aria-live="polite" className="type-body empty:hidden">
+          {reset.isError && <p className="text-error">{reset.error.message}</p>}
+          {reset.isSuccess && (
+            <p className="text-text-secondary">
+              {t.resetDone(reset.variables.name ?? reset.variables.email, reset.data.removed)}
+            </p>
+          )}
+        </div>
       </section>
+      <ConfirmDialog
+        open={resetting !== null}
+        onOpenChange={(open) => {
+          if (!open) setResetting(null);
+        }}
+        title={t.resetTitle}
+        description={t.resetBody(resetting?.name ?? resetting?.email ?? "")}
+        confirmLabel={t.resetConfirm}
+        cancelLabel={t.resetCancel}
+        onConfirm={() => {
+          if (resetting) reset.mutate(resetting);
+        }}
+      />
     </div>
   );
 }

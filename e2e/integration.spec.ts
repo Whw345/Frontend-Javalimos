@@ -258,6 +258,11 @@ test("a teacher opens a course in three tabs: ranking, students and games", asyn
       json: { students: students.map((student) => ({ ...student, name: student.name || null })) },
     });
   });
+  let resetEmail = "";
+  await page.route(`**/api/courses/${courseId}/students/progress`, (route) => {
+    resetEmail = route.request().postDataJSON().email;
+    return route.fulfill({ json: { email: resetEmail, removed: 3 } });
+  });
   await page.route(`**/api/courses/${courseId}/games/${gameId}`, (route) => {
     if (route.request().method() === "PATCH") {
       saved = route.request().postDataJSON().content;
@@ -299,12 +304,22 @@ test("a teacher opens a course in three tabs: ranking, students and games", asyn
 
   await page.getByRole("tab", { name: "Alumnos" }).click();
   await expect(page.getByText("1 alumno en el curso")).toBeVisible();
+  const resetButton = page.getByRole("button", { name: "Reiniciar el progreso de ana@example.test" });
+  await resetButton.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Cancelar" }).click();
+  expect(resetEmail).toBe("");
+  await resetButton.click();
+  await expect(page.getByRole("alertdialog")).toContainText("Ana Díaz perderá sus puntos");
+  await page.screenshot({ path: "test-results/reiniciar-progreso.png" });
+  await page.getByRole("alertdialog").getByRole("button", { name: "Reiniciar" }).click();
+  await expect(page.getByText("Progreso de Ana Díaz reiniciado: 3 intentos borrados.")).toBeVisible();
+  expect(resetEmail).toBe("ana@example.test");
   await page
     .getByLabel("Correos de los alumnos")
     .fill("nuevo@example.test, otro@example.test\ntercero@example.test");
   await page.getByRole("button", { name: "Asignar", exact: true }).click();
   await expect(page.getByText("4 alumnos en el curso")).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("3 sin cuenta aún");
+  await expect(page.getByRole("status").filter({ hasText: "3 sin cuenta aún" })).toBeVisible();
   await expect(page.getByText("Sin cuenta aún", { exact: true })).toHaveCount(3);
   await page.screenshot({ path: "test-results/administracion-alumnos.png", fullPage: true });
   await page.getByRole("button", { name: "Quitar a otro@example.test" }).click();

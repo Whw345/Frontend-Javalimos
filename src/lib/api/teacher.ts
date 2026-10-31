@@ -131,3 +131,10 @@ export const assignStudents = (courseId: string, emails: string[]) =>
 
 export const removeStudent = (courseId: string, email: string) =>
   teacherRequest(`${coursePath(courseId)}/students`, z.unknown(), json("DELETE", { email }));
+
+export const resetStudentProgress = (courseId: string, email: string) =>
+  teacherRequest(
+    `${coursePath(courseId)}/students/progress`,
+    z.object({ email: z.string(), removed: z.number() }),
+    json("DELETE", { email }),
+  );

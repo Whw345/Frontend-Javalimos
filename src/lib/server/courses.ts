@@ -213,6 +213,15 @@ export async function removeStudent(courseId: string, input: unknown) {
   return { email };
 }
 
+/** Para volver a probar el camino: borra sus intentos en este curso, no su inscripción. */
+export async function resetStudentProgress(courseId: string, input: unknown) {
+  const { email } = z.object({ email: z.string().trim().toLowerCase() }).parse(input);
+  const removed = checked(
+    await getDatabase().rpc("reset_course_student", { p_course: courseId, p_email: email }),
+  ) as number;
+  return { email, removed };
+}
+
 export async function finishCourse(courseId: string) {
   const result = await getDatabase().rpc("finish_course_setup", { p_course: courseId });
   if (result.error) {

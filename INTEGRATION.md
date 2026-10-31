@@ -27,7 +27,7 @@ GOOGLE_CLIENT_SECRET=SECRETO_DE_GOOGLE
 
 No uses `NEXT_PUBLIC_` para las claves. `DECISION_LLM_*` sigue disponible para el adaptador HTTP de decisión del equipo; sin esa URL se utiliza LangChain con AI Gateway para decidir. El relleno de juegos utiliza AI Gateway.
 
-En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql`, `202610300005_teachers.sql`, `202610300006_course_admin.sql`, `202610300007_first_week_open.sql`, `202610300008_partial_scores.sql` y `202610300009_remove_free_text.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
+En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql`, `202610300005_teachers.sql`, `202610300006_course_admin.sql`, `202610300007_first_week_open.sql`, `202610300008_partial_scores.sql`, `202610300009_remove_free_text.sql` y `202610300010_reset_student_progress.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
 
 ```powershell
 pnpm dev
@@ -58,7 +58,7 @@ select id from public."user" where lower(email) = 'CORREO-DEL-DOCENTE';
 
 ## Recorrido del estudiante
 
-El docente asigna alumnos por correo en la pestaña de alumnos del curso; quien aún no tiene cuenta entra al curso al registrarse. El rol nunca lo decide el navegador.
+El docente asigna alumnos por correo en la pestaña de alumnos del curso; quien aún no tiene cuenta entra al curso al registrarse. El rol nunca lo decide el navegador. Para volver a probar el camino, el botón de reinicio de cada alumno borra sus intentos en ese curso, y con ellos sus puntos y su cupo, sin quitarlo del curso. Solo el docente del curso puede hacerlo y no se puede deshacer.
 
 El curso aparece en `/cursos` con la etiqueta «Estudiante» y lleva a `/cursos/ID-DEL-CURSO/practicar`, que muestra el camino del curso: las semanas pasadas con lo que jugó, la semana en curso y las futuras en gris, sin tema ni juegos, porque el servidor no los envía. Cada casilla se abre con el cursor, el foco o un toque y describe el juego; el reto empieza con «Jugar». Solo se juegan los retos de esa semana, dentro de su ventana. La sesión recibe opciones sin solución ni cita que revele la respuesta. Los puntos son la fracción resuelta del reto sobre 10, o sobre 5 con pista: cada carta, par o paso correcto suma. En los juegos por cartas o rondas, 75 % o más cuenta como acierto completo. Responder mal vale 2 puntos (1 con pista) y no responder, 0. Lo que el cliente envía al acabarse el tiempo cuenta si llega dentro de 3 segundos. Cada reto tiene un solo intento y hay un máximo de 10 por semana. El tiempo, el cupo y los puntos se controlan en servidor y mediante transacciones SQL. Ningún juego pide redactar ni llama a un modelo durante o después del intento.
 
@@ -131,7 +131,7 @@ No se rediseñó la mecánica de los juegos existentes; `src/styles/tokens.css` 
 - Componentes nuevos: `src/components/teacher/*`, `src/components/student/*`, `src/components/brand/{Logo,CuyFrontal}.tsx`, `src/components/materials/TeacherWorkspace.tsx` y `Workspace.module.css`.
 - APIs nuevas: `src/app/api/auth/[...all]/route.ts`; `src/app/api/courses/[courseId]/{materials,generation,challenges,progress}/route.ts`; `src/app/api/challenges/[sessionId]/route.ts` y sus rutas `hint/route.ts` y `answer/route.ts`.
 - Integración existente adaptada: `src/lib/decision/provider.ts`, `src/app/api/decision/route.ts`, `src/lib/api/schemas.ts`, `src/lib/config.ts`, `src/app/page.tsx`, `src/components/game/GameShell.tsx` y `ResultScreen.tsx`. En los dos últimos solo se ajustó el destino de retorno al listado real; no se modificaron sus estilos.
-- Base de datos: `supabase/migrations/202610300001_learning_pipeline.sql` a `202610300009_remove_free_text.sql`.
+- Base de datos: `supabase/migrations/202610300001_learning_pipeline.sql` a `202610300010_reset_student_progress.sql`.
 - Pruebas: `src/lib/server/{pipeline,routes,model}.test.ts`, `src/test/{database,server-only}.ts`, `e2e/integration.spec.ts`, `playwright.config.ts` y `vitest.config.mts`.
 - PDFs ficticios: `fixtures/{silabo,teoria,vacio}.pdf`; generador `scripts/create-pdf-fixtures.mjs`.
 - Configuración y ejecución: `package.json`, `pnpm-lock.yaml`, `.env.example`, `.gitignore`, `next.config.ts`, `tsconfig.json`, `Dockerfile` y `.dockerignore`.

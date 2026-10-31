@@ -13,6 +13,7 @@ import {
   GET as getStudents,
   POST as assign,
 } from "@/app/api/courses/[courseId]/students/route";
+import { DELETE as resetProgress } from "@/app/api/courses/[courseId]/students/progress/route";
 import { POST as generate, PATCH as publish } from "@/app/api/courses/[courseId]/generation/route";
 import { GET as weekChallenges, POST as start } from "@/app/api/courses/[courseId]/challenges/route";
 import { GET as getSession } from "@/app/api/challenges/[sessionId]/route";
@@ -488,11 +489,45 @@ it("assigns students by email, with or without an account, and ranks them by poi
   expect((await remove(request("students", "DELETE", { email: "ana@example.test" }), context)).status).toBe(
     403,
   );
+  const resetRequest = (email: string) => request("students/progress", "DELETE", { email });
+  expect((await resetProgress(resetRequest("ana@example.test"), context)).status).toBe(403);
   state.userId = "";
   expect((await getLeaderboard(new Request("http://localhost"), context)).status).toBe(401);
   expect((await assign(request("students", "POST", { emails: ["a@b.co"] }), context)).status).toBe(401);
-
+  expect((await resetProgress(resetRequest("ana@example.test"), context)).status).toBe(401);
+  const crossOrigin = new Request("http://localhost/progress", {
+    method: "DELETE",
+    headers: { Origin: "https://evil.example" },
+    body: JSON.stringify({ email: "ana@example.test" }),
+  });
   state.userId = teacher;
+  expect((await resetProgress(crossOrigin, context)).status).toBe(403);
+
+  // Solo se borra lo de este alumno en este curso.
+  await db.query(
+    `insert into challenge_sessions(user_id,course_id,week_number,challenge_id,deadline,points)
+    values ($1,$2,1,$4,now(),10),('nuevo',$3,1,$4,now(),5)`,
+    [ana, otherCourseId, id, challenge.rows[0]!.id],
+  );
+  expect(await (await resetProgress(resetRequest("docente@example.test"), context)).json()).toEqual({
+    email: "docente@example.test",
+    removed: 0,
+  });
+  expect(await (await resetProgress(resetRequest(" ANA@example.test"), context)).json()).toEqual({
+    email: "ana@example.test",
+    removed: 3,
+  });
+  expect(await ranking()).toEqual([
+    { userId: "nuevo", name: "Nuevo Alumno", points: 5, played: 0, rank: 1 },
+    { userId: ana, name: "Ana Diaz", points: 0, played: 0, rank: 2 },
+  ]);
+  const kept = await db.query("select 1 from challenge_sessions where user_id = $1 and course_id = $2", [
+    ana,
+    otherCourseId,
+  ]);
+  expect(kept.rows).toHaveLength(1);
+  expect((await roster()).map((item: { email: string }) => item.email)).toContain("ana@example.test");
+
   expect((await remove(request("students", "DELETE", { email: "ANA@example.test" }), context)).status).toBe(
     200,
   );
@@ -501,6 +536,9 @@ it("assigns students by email, with or without an account, and ranks them by poi
   await db.exec("set role authenticated");
   await expect(db.query("select email from course_invites")).rejects.toThrow("permission denied");
   await expect(db.query(`select course_roster('${id}')`)).rejects.toThrow("permission denied");
+  await expect(db.query(`select reset_course_student('${id}','ana@example.test')`)).rejects.toThrow(
+    "permission denied",
+  );
   await db.exec("reset role");
 }, 30_000);
 

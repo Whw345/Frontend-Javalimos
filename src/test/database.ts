@@ -18,6 +18,7 @@ export async function createTestDatabase() {
     "202610300007_first_week_open.sql",
     "202610300008_partial_scores.sql",
     "202610300009_remove_free_text.sql",
+    "202610300010_reset_student_progress.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }

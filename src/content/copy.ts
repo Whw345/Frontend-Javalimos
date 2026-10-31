@@ -224,6 +224,14 @@ export const copy = {
         pending: "Sin cuenta aún",
         pendingHint: "Se inscribe solo al crear su cuenta con este correo.",
         remove: (email: string) => `Quitar a ${email}`,
+        reset: (email: string) => `Reiniciar el progreso de ${email}`,
+        resetTitle: "¿Reiniciar su progreso?",
+        resetBody: (name: string) =>
+          `${name} perderá sus puntos e intentos de este curso y podrá volver a jugar los retos. No se puede deshacer.`,
+        resetConfirm: "Reiniciar",
+        resetCancel: "Cancelar",
+        resetDone: (name: string, attempts: number) =>
+          `Progreso de ${name} reiniciado: ${attempts} ${attempts === 1 ? "intento borrado" : "intentos borrados"}.`,
         empty: "Aún no hay alumnos",
         emptyHint: "Los alumnos que asignes verán este curso al ingresar.",
         loadFailed: "No pudimos cargar los alumnos.",
