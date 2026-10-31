@@ -381,7 +381,8 @@ it("takes a teacher from a new course to a finished path", async () => {
   const failedPath = await (await getPath(new Request("http://localhost"), context)).json();
   expect(failedPath.weeks[1]).toMatchObject({
     generationStatus: "failed",
-    generationError: "No se pudieron generar los juegos de esta semana.",
+    generationError:
+      "No se pudieron generar los juegos. El material no pasó las validaciones o no fue suficiente.",
     games: [],
   });
   expect((await generate(request("generation", "POST", { weekNumber: 2 }), context)).status).toBe(200);

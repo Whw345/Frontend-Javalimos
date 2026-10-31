@@ -16,8 +16,25 @@ export class ApiError extends Error {
 
 /** Traduce el `code` de un error del API (o cualquier error) a un mensaje de copy.ts. */
 export function errorMessage(error: unknown): string {
-  const code = error instanceof ApiError ? error.code : "UNKNOWN";
-  return code in copy.errors ? copy.errors[code as ErrorCode] : copy.errors.UNKNOWN;
+  if (error instanceof TypeError) return copy.errors.NETWORK_ERROR;
+
+  if (!(error instanceof ApiError)) return copy.errors.UNKNOWN;
+
+  if (error.code in copy.errors) return copy.errors[error.code as ErrorCode];
+
+  const statusMessages: Record<number, ErrorCode> = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    409: "CONFLICT",
+    422: "INVALID_INPUT",
+    500: "SERVICE_UNAVAILABLE",
+    502: "SERVICE_UNAVAILABLE",
+    503: "SERVICE_UNAVAILABLE",
+  };
+
+  return copy.errors[statusMessages[error.status] ?? "UNKNOWN"];
 }
 
 export async function apiRequest<T>(path: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
