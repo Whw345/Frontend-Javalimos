@@ -25,6 +25,7 @@ export async function createTestDatabase() {
 export function createTestClient(db: PGlite) {
   class Query {
     columns = "*";
+    returning = false;
     operation = "select";
     value: unknown;
     filters: string[] = [];
@@ -36,6 +37,7 @@ export function createTestClient(db: PGlite) {
     }
     select(columns = "*") {
       this.columns = columns;
+      this.returning = true;
       return this;
     }
     insert(value: unknown) {
@@ -97,6 +99,8 @@ export function createTestClient(db: PGlite) {
           sql = `select ${this.columns} from ${this.table}${where}${this.sort}`;
         }
         const result = await db.query(sql, parameters);
+        // Like PostgREST, a write returns no rows unless it chains .select().
+        if (this.operation !== "select" && !this.returning) return { data: null, error: null };
         return { data: this.one ? (result.rows[0] ?? null) : result.rows, error: null };
       } catch (error) {
         return { data: null, error };
