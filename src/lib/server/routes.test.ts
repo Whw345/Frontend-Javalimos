@@ -7,6 +7,12 @@ import { GET as listCourses, POST as createCourse } from "@/app/api/courses/rout
 import { GET as getPath } from "@/app/api/courses/[courseId]/route";
 import { POST as finish } from "@/app/api/courses/[courseId]/finish/route";
 import { GET as getGame, PATCH as editGame } from "@/app/api/courses/[courseId]/games/[gameId]/route";
+import { GET as getLeaderboard } from "@/app/api/courses/[courseId]/leaderboard/route";
+import {
+  DELETE as remove,
+  GET as getStudents,
+  POST as assign,
+} from "@/app/api/courses/[courseId]/students/route";
 import { POST as generate, PATCH as publish } from "@/app/api/courses/[courseId]/generation/route";
 import { POST as start } from "@/app/api/courses/[courseId]/challenges/route";
 import { GET as getSession } from "@/app/api/challenges/[sessionId]/route";
@@ -393,9 +399,106 @@ it("takes a teacher from a new course to a finished path", async () => {
   expect(
     donePath.weeks.flatMap((week: { games: { status: string }[] }) => week.games.map((item) => item.status)),
   ).toEqual(["published", "published"]);
+
+  const inPlay = await db.query<{ id: string }>(
+    `insert into challenge_sessions(user_id,course_id,week_number,challenge_id,deadline)
+    values ($1,$2,1,$3,now() + interval '1 minute') returning id`,
+    [student, id, gameId],
+  );
+  const blocked = await editGame(request("games", "PATCH", { content: game.content }), gameContext);
+  expect(blocked.status).toBe(409);
+  expect(await blocked.json()).toMatchObject({ code: "GAME_IN_PLAY" });
+  await db.query("update challenge_sessions set answered_at = now() where id = $1", [inPlay.rows[0]!.id]);
+  expect((await editGame(request("games", "PATCH", { content: game.content }), gameContext)).status).toBe(
+    200,
+  );
+  await db.query("update generated_challenges set status = 'discarded' where id = $1", [gameId]);
   expect((await editGame(request("games", "PATCH", { content: game.content }), gameContext)).status).toBe(
     409,
   );
+}, 30_000);
+
+it("assigns students by email, with or without an account, and ranks them by points", async () => {
+  const id = "77777777-7777-4777-8777-777777777777";
+  const ana = "88888888-8888-4888-8888-888888888888";
+  const context = { params: Promise.resolve({ courseId: id }) };
+  const body = async (response: Response) => response.json();
+  const roster = async () =>
+    (await body(await getStudents(new Request("http://localhost"), context))).students;
+  const ranking = async () =>
+    (await body(await getLeaderboard(new Request("http://localhost"), context))).leaderboard;
+  await db.exec(`insert into courses(id,name) values ('${id}','Genetica')`);
+  await db.query(`insert into course_members(course_id,user_id,role) values ('${id}',$1,'teacher')`, [
+    teacher,
+  ]);
+  await db.query(`update "user" set email = 'docente@example.test' where id = $1`, [teacher]);
+  await db.query(
+    `insert into "user"(id,name,email,"emailVerified") values ($1,'Ana Diaz','ana@example.test',true)`,
+    [ana],
+  );
+
+  state.userId = teacher;
+  expect(await ranking()).toEqual([]);
+  const assigned = await assign(
+    request("students", "POST", {
+      emails: [" ANA@example.test ", "ana@example.test", "nuevo@example.test", "docente@example.test"],
+    }),
+    context,
+  );
+  expect(await assigned.json()).toEqual({ enrolled: 1, invited: 1 });
+  expect(await roster()).toEqual([
+    { email: "ana@example.test", name: "Ana Diaz", pending: false },
+    { email: "nuevo@example.test", name: null, pending: true },
+  ]);
+  const members = await db.query<{ role: string }>(
+    "select role from course_members where course_id = $1 and user_id = $2",
+    [id, teacher],
+  );
+  expect(members.rows[0]!.role).toBe("teacher");
+  const invalid = await assign(request("students", "POST", { emails: ["no-es-correo"] }), context);
+  expect(invalid.status).toBe(422);
+  expect((await invalid.json()).message).toContain("no-es-correo");
+
+  // Registrarse con ese correo, con contraseña o Google, inscribe sin pasos extra.
+  await db.query(
+    `insert into "user"(id,name,email,"emailVerified") values ('nuevo','Nuevo Alumno','Nuevo@example.test',true)`,
+  );
+  await db.query(`update "user" set email = 'nuevo@example.test' where id = 'nuevo'`);
+  expect((await roster()).map((item: { pending: boolean }) => item.pending)).toEqual([false, false]);
+  expect((await db.query("select 1 from course_invites where course_id = $1", [id])).rows).toHaveLength(0);
+
+  const challenge = await db.query<{ id: string }>("select id from generated_challenges limit 1");
+  await db.query(
+    `insert into challenge_sessions(user_id,course_id,week_number,challenge_id,deadline,answered_at,points)
+    values ($1,$2,1,$3,now(),now(),10),($1,$2,1,$3,now(),now(),5),($1,$2,1,$3,now(),null,0)`,
+    [ana, id, challenge.rows[0]!.id],
+  );
+  expect(await ranking()).toEqual([
+    { userId: ana, name: "Ana Diaz", points: 15, played: 2, rank: 1 },
+    { userId: "nuevo", name: "Nuevo Alumno", points: 0, played: 0, rank: 2 },
+  ]);
+
+  state.userId = student;
+  expect((await getLeaderboard(new Request("http://localhost"), context)).status).toBe(403);
+  expect((await getStudents(new Request("http://localhost"), context)).status).toBe(403);
+  expect((await assign(request("students", "POST", { emails: ["a@b.co"] }), context)).status).toBe(403);
+  expect((await remove(request("students", "DELETE", { email: "ana@example.test" }), context)).status).toBe(
+    403,
+  );
+  state.userId = "";
+  expect((await getLeaderboard(new Request("http://localhost"), context)).status).toBe(401);
+  expect((await assign(request("students", "POST", { emails: ["a@b.co"] }), context)).status).toBe(401);
+
+  state.userId = teacher;
+  expect((await remove(request("students", "DELETE", { email: "ANA@example.test" }), context)).status).toBe(
+    200,
+  );
+  expect((await roster()).map((item: { email: string }) => item.email)).toEqual(["nuevo@example.test"]);
+  expect((await ranking()).map((item: { name: string }) => item.name)).toEqual(["Nuevo Alumno"]);
+  await db.exec("set role authenticated");
+  await expect(db.query("select email from course_invites")).rejects.toThrow("permission denied");
+  await expect(db.query(`select course_roster('${id}')`)).rejects.toThrow("permission denied");
+  await db.exec("reset role");
 }, 30_000);
 
 it("rejects courses without a usable name and anonymous listings", async () => {

@@ -2,10 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, RotateCcw } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CuyFrontal } from "@/components/brand/CuyFrontal";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonVariants } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { copy } from "@/content/copy";
@@ -48,7 +49,7 @@ function WeekPath({
   week: PathWeek;
   offset: number;
   onEdit: (gameId: string) => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   retrying: boolean;
 }) {
   const failed = week.generationStatus === "failed";
@@ -78,10 +79,12 @@ function WeekPath({
           <p className="type-body text-text-secondary">
             {failed ? (week.generationError ?? t.failed) : t.noGames}
           </p>
-          <Button variant="secondary" size="sm" loading={retrying} onClick={onRetry}>
-            <RotateCcw aria-hidden />
-            {t.retry}
-          </Button>
+          {onRetry && (
+            <Button variant="secondary" size="sm" loading={retrying} onClick={onRetry}>
+              <RotateCcw aria-hidden />
+              {t.retry}
+            </Button>
+          )}
         </div>
       )}
       {week.games.length > 0 && !busy(week) && (
@@ -121,7 +124,8 @@ function WeekPath({
   );
 }
 
-export function LearningPath({ courseId }: { courseId: string }) {
+/** Página propia al crear el curso; `embedded` es la pestaña Juegos de su administración. */
+export function LearningPath({ courseId, embedded = false }: { courseId: string; embedded?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<string | null>(null);
@@ -137,8 +141,8 @@ export function LearningPath({ courseId }: { courseId: string }) {
   const setupCompleted = path.data?.course.setupCompleted;
   useEffect(() => {
     if (unauthorized) router.replace("/ingresar");
-    if (setupCompleted) router.replace(`/docente/${courseId}`);
-  }, [unauthorized, setupCompleted, courseId, router]);
+    if (setupCompleted && !embedded) router.replace(`/docente/${courseId}`);
+  }, [unauthorized, setupCompleted, embedded, courseId, router]);
 
   const refresh = useCallback(
     () => queryClient.invalidateQueries({ queryKey: ["teacher", "course", courseId] }),
@@ -176,13 +180,25 @@ export function LearningPath({ courseId }: { courseId: string }) {
 
   const finish = useMutation({
     mutationFn: () => finishCourse(courseId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["teacher", "courses"] });
-      router.push(`/docente/${courseId}`);
-    },
+    // Al refrescar, la página del camino redirige sola a la administración del curso.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["teacher"] }),
   });
 
-  if (path.data && path.data.weeks.length === 0) return <CourseUpload existingCourseId={courseId} />;
+  if (path.data && path.data.weeks.length === 0) {
+    if (!embedded) return <CourseUpload existingCourseId={courseId} />;
+    return (
+      <EmptyState
+        className="py-8"
+        title={copy.teacher.admin.games.noMaterial}
+        description={copy.teacher.admin.games.noMaterialHint}
+        action={
+          <Link href={`/docente/${courseId}/camino`} className={buttonVariants()}>
+            {copy.teacher.admin.games.upload}
+          </Link>
+        }
+      />
+    );
+  }
 
   const total = weeks?.length ?? 0;
   const finished = weeks?.filter((week) => !busy(week)).length ?? 0;
@@ -193,9 +209,9 @@ export function LearningPath({ courseId }: { courseId: string }) {
     [0],
   );
   return (
-    <div className="min-h-dvh bg-bg px-4 pt-6 pb-28 md:px-6">
+    <div className={cn(!embedded && "min-h-dvh bg-bg px-4 pt-6 md:px-6", !setupCompleted && "pb-28")}>
       <div className="mx-auto flex max-w-xl flex-col gap-8">
-        <TeacherHeader />
+        {!embedded && <TeacherHeader />}
         {path.isPending && <Skeleton className="h-96" />}
         {path.isError && !unauthorized && (
           <EmptyState
@@ -212,7 +228,7 @@ export function LearningPath({ courseId }: { courseId: string }) {
             <div className="flex items-center gap-4">
               <CuyFrontal expresion={generating ? "espera" : "feliz"} size={72} />
               <div className="min-w-0" role="status" aria-live="polite">
-                <h1 className="type-h1 text-text">{path.data.course.name}</h1>
+                {!embedded && <h1 className="type-h1 text-text">{path.data.course.name}</h1>}
                 <p className="type-body text-text-secondary">
                   {generating ? `${t.generating} ${t.progress(finished, total)}` : t.ready}
                 </p>
@@ -225,7 +241,7 @@ export function LearningPath({ courseId }: { courseId: string }) {
                   week={week}
                   offset={offsets[index]!}
                   onEdit={setEditing}
-                  onRetry={() => retry(week.weekNumber)}
+                  onRetry={setupCompleted ? undefined : () => retry(week.weekNumber)}
                   retrying={retrying === week.weekNumber}
                 />
               ))}
@@ -233,7 +249,7 @@ export function LearningPath({ courseId }: { courseId: string }) {
           </>
         )}
       </div>
-      {path.data && (
+      {path.data && !setupCompleted && (
         <div className="fixed inset-x-0 bottom-0 z-(--z-sticky) border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-sm">
           <div className="mx-auto flex max-w-xl flex-col items-center gap-2">
             {finish.isError && (

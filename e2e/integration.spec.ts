@@ -181,10 +181,154 @@ test("a teacher signs in, creates a course from PDFs, edits the path and finishe
   await page.getByRole("button", { name: "Terminar" }).click();
   await expect(page).toHaveURL(new RegExp(`/docente/${courseId}$`));
   await expect(page.getByText("Administración del curso")).toBeVisible();
-  await page.screenshot({ path: "test-results/administracion.png" });
+  await expect(page.getByRole("tab", { name: "Ranking" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("link", { name: "Volver a mis cursos" }).last().click();
   await expect(page.getByRole("link", { name: /Biología/ })).toBeVisible();
   await page.screenshot({ path: "test-results/cursos.png" });
+});
+
+test("a teacher opens a course in three tabs: ranking, students and games", async ({ page }) => {
+  const students = [{ email: "ana@example.test", name: "Ana Díaz", pending: false }];
+  const entry = (rank: number, name: string, points: number) => ({
+    userId: name,
+    name,
+    points,
+    played: points / 10,
+    rank,
+  });
+  let saved: Record<string, unknown> | null = null;
+  await page.route("**/api/courses", (route) =>
+    route.fulfill({
+      json: {
+        canCreateCourses: true,
+        courses: [
+          { id: courseId, name: "Biología", role: "teacher", setupCompleted: true, weeks: 1, games: 1 },
+          { id: "in-setup", name: "Química", role: "teacher", setupCompleted: false, weeks: 1, games: 1 },
+        ],
+      },
+    }),
+  );
+  const pathOf = (id: string, name: string, setupCompleted: boolean) => ({
+    course: { id, name, setupCompleted },
+    weeks: [
+      {
+        weekNumber: 1,
+        topic: "Células",
+        generationStatus: "done",
+        generationError: null,
+        deadline: null,
+        games: [{ id: gameId, game: "hueco", difficulty: 1, status: setupCompleted ? "published" : "draft" }],
+      },
+    ],
+  });
+  await page.route(`**/api/courses/${courseId}`, (route) =>
+    route.fulfill({ json: pathOf(courseId, "Biología", true) }),
+  );
+  await page.route("**/api/courses/in-setup", (route) =>
+    route.fulfill({ json: pathOf("in-setup", "Química", false) }),
+  );
+  await page.route(`**/api/courses/${courseId}/leaderboard`, (route) =>
+    route.fulfill({
+      json: {
+        leaderboard: [
+          entry(1, "Ana Díaz", 120),
+          entry(2, "Luis Rojas", 90),
+          entry(3, "Mía Soto", 60),
+          entry(4, "Omar Ruiz", 0),
+        ],
+      },
+    }),
+  );
+  await page.route(`**/api/courses/${courseId}/students`, (route) => {
+    const method = route.request().method();
+    if (method === "POST") {
+      const { emails } = route.request().postDataJSON() as { emails: string[] };
+      students.push(...emails.map((email) => ({ email, name: "", pending: true })));
+      return route.fulfill({ json: { enrolled: 0, invited: emails.length } });
+    }
+    if (method === "DELETE") {
+      const { email } = route.request().postDataJSON() as { email: string };
+      students.splice(
+        students.findIndex((student) => student.email === email),
+        1,
+      );
+      return route.fulfill({ json: { email } });
+    }
+    return route.fulfill({
+      json: { students: students.map((student) => ({ ...student, name: student.name || null })) },
+    });
+  });
+  await page.route(`**/api/courses/${courseId}/games/${gameId}`, (route) => {
+    if (route.request().method() === "PATCH") {
+      saved = route.request().postDataJSON().content;
+      return route.fulfill({ json: { id: gameId } });
+    }
+    return route.fulfill({
+      json: {
+        id: gameId,
+        game: "hueco",
+        difficulty: 1,
+        status: "published",
+        weekNumber: 1,
+        content: {
+          before: "La ",
+          answer: "mitocondria",
+          after: " produce ATP.",
+          distractors: ["membrana", "pared celular"],
+          explanation: "La mitocondria produce ATP.",
+          sourceId: "doc",
+          evidence: "Evidencia",
+        },
+        source: { documento: "teoria.pdf" },
+        evidence: "Evidencia",
+      },
+    });
+  });
+
+  await page.goto("/cursos");
+  await expect(page.getByRole("link", { name: /Crear curso/ })).toHaveAttribute("href", "/docente/nuevo");
+  await page.getByRole("link", { name: /Biología/ }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/docente/${courseId}$`));
+  await expect(page.getByRole("tab")).toHaveText(["Ranking", "Alumnos", "Juegos"]);
+  const rows = page.getByRole("listitem");
+  await expect(rows).toHaveCount(4);
+  await expect(rows.first()).toContainText("Ana Díaz");
+  await expect(rows.first()).toContainText("120 pts");
+  await page.screenshot({ path: "test-results/administracion-ranking.png", fullPage: true });
+
+  await page.getByRole("tab", { name: "Alumnos" }).click();
+  await expect(page.getByText("1 alumno en el curso")).toBeVisible();
+  await page
+    .getByLabel("Correos de los alumnos")
+    .fill("nuevo@example.test, otro@example.test\ntercero@example.test");
+  await page.getByRole("button", { name: "Asignar", exact: true }).click();
+  await expect(page.getByText("4 alumnos en el curso")).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("3 sin cuenta aún");
+  await expect(page.getByText("Sin cuenta aún", { exact: true })).toHaveCount(3);
+  await page.screenshot({ path: "test-results/administracion-alumnos.png", fullPage: true });
+  await page.getByRole("button", { name: "Quitar a otro@example.test" }).click();
+  await expect(page.getByText("3 alumnos en el curso")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Juegos" }).click();
+  await expect(page.getByRole("button", { name: "Terminar" })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/administracion-juegos.png", fullPage: true });
+  await page.getByRole("button", { name: "Editar Hueco, semana 1" }).click();
+  await page.getByLabel("Respuesta correcta").fill("mitocondrias");
+  await page.getByRole("button", { name: "Guardar" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(saved).toMatchObject({ answer: "mitocondrias" });
+
+  for (const width of [360, 768, 1280]) {
+    await page.setViewportSize({ width, height: 720 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+
+  await page.goto("/cursos");
+  await page.getByRole("link", { name: /Química/ }).click();
+  await expect(page).toHaveURL(/\/docente\/in-setup$/);
+  await expect(page.getByRole("tab", { name: "Juegos" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: "Terminar" })).toBeEnabled();
 });
 
 test("a student sees their courses but cannot create one", async ({ page }) => {

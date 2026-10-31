@@ -10,6 +10,7 @@ import { checked, getDatabase, isTeacher } from "./supabase";
 
 /** Same window after which claim_week_generation lets a week be claimed again. */
 const STALE_GENERATION_MS = 5 * 60 * 1000;
+const MAX_ASSIGNED_EMAILS = 200;
 
 export async function listCourses(userId: string) {
   const db = getDatabase();
@@ -134,8 +135,14 @@ export async function getGame(courseId: string, gameId: string) {
 /** El docente edita los parámetros; payload, solución y pista se reconstruyen en el servidor. */
 export async function updateGame(courseId: string, gameId: string, input: unknown) {
   const game = await findGame(courseId, gameId);
-  if (game.status !== "draft" || !game.content)
+  if (game.status === "discarded" || !game.content)
     throw new HttpError(409, "GAME_LOCKED", "Este juego ya no se puede editar.");
+  // La solución se reconstruye: quien está jugando respondería a un reto que ya cambió.
+  const sessions = checked(
+    await getDatabase().from("challenge_sessions").select("deadline, answered_at").eq("challenge_id", gameId),
+  );
+  if (sessions.some((row) => !row.answered_at && new Date(row.deadline as string).getTime() > Date.now()))
+    throw new HttpError(409, "GAME_IN_PLAY", "Un alumno está jugando este reto. Inténtalo en un minuto.");
   const slug = gameSlugSchema.parse(game.game);
   const previous = game.content as { sourceId: string; evidence: string };
   const content = gameCatalog[slug].schema.parse({
@@ -170,6 +177,32 @@ export async function updateGame(courseId: string, gameId: string, input: unknow
       .maybeSingle(),
   );
   return { id: gameId };
+}
+
+export async function getLeaderboard(courseId: string) {
+  return { leaderboard: checked(await getDatabase().rpc("course_leaderboard", { p_course: courseId })) };
+}
+
+export async function getStudents(courseId: string) {
+  return { students: checked(await getDatabase().rpc("course_roster", { p_course: courseId })) };
+}
+
+/** Acepta varios correos a la vez: el docente suele pegar la lista de la sección. */
+export async function assignStudents(courseId: string, input: unknown) {
+  const { emails } = z.object({ emails: z.array(z.string()).min(1).max(MAX_ASSIGNED_EMAILS) }).parse(input);
+  const addresses = [...new Set(emails.map((email) => email.trim().toLowerCase()))];
+  const invalid = addresses.filter((email) => !z.email().safeParse(email).success);
+  if (invalid.length)
+    throw new HttpError(422, "INVALID_EMAIL", `Revisa estos correos: ${invalid.join(", ")}.`);
+  return checked(
+    await getDatabase().rpc("assign_course_students", { p_course: courseId, p_emails: addresses }),
+  );
+}
+
+export async function removeStudent(courseId: string, input: unknown) {
+  const { email } = z.object({ email: z.string().trim().toLowerCase() }).parse(input);
+  checked(await getDatabase().rpc("remove_course_student", { p_course: courseId, p_email: email }));
+  return { email };
 }
 
 export async function finishCourse(courseId: string) {
