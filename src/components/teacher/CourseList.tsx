@@ -19,8 +19,7 @@ import { TeacherHeader } from "./TeacherHeader";
 const t = copy.teacher.courses;
 
 function courseHref(course: CourseCard) {
-  if (course.role !== "teacher") return `/cursos/${course.id}/practicar`;
-  return course.setupCompleted ? `/docente/${course.id}` : `/docente/${course.id}/camino`;
+  return course.role === "teacher" ? `/docente/${course.id}` : `/cursos/${course.id}/practicar`;
 }
 
 function courseState(course: CourseCard) {

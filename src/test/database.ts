@@ -14,6 +14,7 @@ export async function createTestDatabase() {
     "202610300003_drop_legacy_tables.sql",
     "202610300004_teacher_flow.sql",
     "202610300005_teachers.sql",
+    "202610300006_course_admin.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }

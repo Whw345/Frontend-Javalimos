@@ -43,6 +43,22 @@ export const editableGameSchema = z.object({
 });
 export type EditableGame = z.infer<typeof editableGameSchema>;
 
+export const leaderboardEntrySchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  points: z.number(),
+  played: z.number(),
+  rank: z.number(),
+});
+export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>;
+
+export const courseStudentSchema = z.object({
+  email: z.string(),
+  name: z.string().nullable(),
+  pending: z.boolean(),
+});
+export type CourseStudent = z.infer<typeof courseStudentSchema>;
+
 /** Estas rutas ya responden en español; el mensaje del servidor se muestra tal cual. */
 async function teacherRequest<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: "include" });
@@ -96,3 +112,22 @@ export const getGame = (courseId: string, gameId: string) =>
 
 export const saveGame = (courseId: string, gameId: string, content: Record<string, unknown>) =>
   teacherRequest(`${coursePath(courseId)}/games/${gameId}`, z.unknown(), json("PATCH", { content }));
+
+export const getLeaderboard = (courseId: string) =>
+  teacherRequest(
+    `${coursePath(courseId)}/leaderboard`,
+    z.object({ leaderboard: z.array(leaderboardEntrySchema) }),
+  );
+
+export const getStudents = (courseId: string) =>
+  teacherRequest(`${coursePath(courseId)}/students`, z.object({ students: z.array(courseStudentSchema) }));
+
+export const assignStudents = (courseId: string, emails: string[]) =>
+  teacherRequest(
+    `${coursePath(courseId)}/students`,
+    z.object({ enrolled: z.number(), invited: z.number() }),
+    json("POST", { emails }),
+  );
+
+export const removeStudent = (courseId: string, email: string) =>
+  teacherRequest(`${coursePath(courseId)}/students`, z.unknown(), json("DELETE", { email }));
