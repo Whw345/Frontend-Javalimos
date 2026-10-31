@@ -416,7 +416,8 @@ export async function generateWeek(courseId: string, weekNumber: number) {
         content: game.content,
         position,
         time_limit_seconds: game.timeLimitSeconds,
-        opens_at: window?.opensAt ?? null,
+        // Week 1 is already the active one before the first Monday, so it opens on publishing.
+        opens_at: weekNumber === 1 ? null : (window?.opensAt ?? null),
         deadline: window?.deadline ?? null,
       })),
     });

@@ -30,15 +30,23 @@ export async function listCourses(userId: string) {
   return {
     canCreateCourses,
     courses: courses
-      .map((course) => ({
-        id: course.id as string,
-        name: course.name as string,
-        createdAt: new Date(course.created_at as string).toISOString(),
-        role: memberships.find((membership) => membership.course_id === course.id)!.role as string,
-        setupCompleted: Boolean(course.setup_completed_at),
-        weeks: weeks.filter((week) => week.course_id === course.id).length,
-        games: games.filter((game) => game.course_id === course.id && game.status !== "discarded").length,
-      }))
+      .map((course) => {
+        const role = memberships.find((membership) => membership.course_id === course.id)!.role as string;
+        return {
+          id: course.id as string,
+          name: course.name as string,
+          createdAt: new Date(course.created_at as string).toISOString(),
+          role,
+          setupCompleted: Boolean(course.setup_completed_at),
+          weeks: weeks.filter((week) => week.course_id === course.id).length,
+          // Drafts only exist for the teacher.
+          games: games.filter(
+            (game) =>
+              game.course_id === course.id &&
+              (role === "teacher" ? game.status !== "discarded" : game.status === "published"),
+          ).length,
+        };
+      })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
 }

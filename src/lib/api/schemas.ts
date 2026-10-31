@@ -65,6 +65,21 @@ export const hintResponseSchema = z.object({
 });
 export type HintResponse = z.infer<typeof hintResponseSchema>;
 
+export const weekChallengeSchema = z.object({
+  id: z.string(),
+  game: gameSlugSchema,
+  difficulty: difficultySchema,
+  deadline: z.iso.datetime().nullable(),
+  played: z.boolean(),
+  points: z.number().int().nullable(),
+});
+export type WeekChallenge = z.infer<typeof weekChallengeSchema>;
+
+export const weekChallengesSchema = z.object({
+  course: z.object({ name: z.string(), current_week: z.number().int() }),
+  challenges: z.array(weekChallengeSchema),
+});
+
 export const apiErrorSchema = z.object({ code: z.string(), message: z.string() });
 export type ApiErrorBody = z.infer<typeof apiErrorSchema>;
 

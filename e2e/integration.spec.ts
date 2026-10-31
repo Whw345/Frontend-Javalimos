@@ -381,7 +381,24 @@ test("a published challenge renders the existing Hueco GameShell and submits for
           ? session()
           : {
               course: { name: "Biología", current_week: 1 },
-              challenges: [{ id: "fixture", game: "hueco", difficulty: 1 }],
+              challenges: [
+                {
+                  id: "fixture",
+                  game: "hueco",
+                  difficulty: 1,
+                  deadline: "2026-11-09T05:00:00.000Z",
+                  played: false,
+                  points: null,
+                },
+                {
+                  id: "fixture-played",
+                  game: "parejas",
+                  difficulty: 1,
+                  deadline: "2026-11-09T05:00:00.000Z",
+                  played: true,
+                  points: 5,
+                },
+              ],
             },
     }),
   );
@@ -402,6 +419,12 @@ test("a published challenge renders the existing Hueco GameShell and submits for
     });
   });
   await page.goto(`/cursos/${courseId}/practicar`);
+  await expect(page.getByRole("heading", { name: "Biología" })).toBeVisible();
+  await expect(page.getByText("Semana 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Disponibles hasta lun 9 nov, 00:00")).toBeVisible();
+  await expect(page.getByText("Jugado · +5 pts")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Jugar", exact: true })).toHaveCount(1);
+  await page.screenshot({ path: "test-results/practicar.png", fullPage: true });
   await page.getByRole("button", { name: "Jugar", exact: true }).click();
   await expect(page).toHaveURL(/\/reto\/fixture-session$/);
   await page.getByRole("button", { name: /mitocondria/i }).click();

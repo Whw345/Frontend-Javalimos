@@ -84,8 +84,19 @@ export const copy = {
     weeklyLimitReached: "Vuelve el lunes",
   },
 
+  practice: {
+    week: (week: number) => `Semana ${week}`,
+    deadline: (date: string) => `Disponibles hasta ${date}`,
+    played: (points: number) => `Jugado · +${points} pts`,
+    empty: "Esta semana no hay retos",
+    emptyHint: "Cuando abra la próxima semana, sus retos aparecerán aquí.",
+    loadFailed: "No pudimos cargar los retos de este curso.",
+  },
+
   errors: {
     WEEKLY_LIMIT_REACHED: "Completaste tus 10 retos de la semana. Vuelve el lunes.",
+    NO_CHALLENGE: "Este reto ya no está disponible.",
+    ALREADY_ANSWERED: "Ya respondiste este reto.",
     CHALLENGE_EXPIRED: "El tiempo de este reto ya terminó.",
     SESSION_NOT_FOUND: "No encontramos este reto. Empieza uno nuevo.",
     INVALID_PAYLOAD: "Este reto llegó con datos que no podemos mostrar.",
