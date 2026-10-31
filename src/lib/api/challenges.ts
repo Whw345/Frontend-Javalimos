@@ -4,7 +4,7 @@ import {
   challengeSessionSchema,
   hintResponseSchema,
   progressTotalsSchema,
-  weekChallengesSchema,
+  studentPathSchema,
   type ChallengeSession,
   type CreateChallengeBody,
   type SubmitAnswerBody,
@@ -24,8 +24,8 @@ export function getCourseProgress(courseId: string) {
   return apiRequest(`/api/courses/${courseId}/progress`, progressTotalsSchema);
 }
 
-export function getWeekChallenges(courseId: string) {
-  return apiRequest(`/api/courses/${courseId}/challenges`, weekChallengesSchema);
+export function getStudentPath(courseId: string) {
+  return apiRequest(`/api/courses/${courseId}/challenges`, studentPathSchema);
 }
 
 export async function createChallenge(courseId: string, body: CreateChallengeBody) {

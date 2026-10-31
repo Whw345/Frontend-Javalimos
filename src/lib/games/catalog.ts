@@ -426,33 +426,6 @@ export const gameCatalog: Record<GameSlug, CatalogGame> = {
         .max(8),
     },
   ),
-  explicalo: game(
-    "explicalo",
-    copy.games.explicalo.name,
-    "El estudiante explica un concepto en una frase y un LLM la evalúa después. Sirve para ideas centrales que requieren comprensión, no solo memoria.",
-    () => "entre 2 y 5 ideas clave",
-    [
-      { name: "concept", label: "Concepto", description: "Concepto a explicar.", kind: "text", max: 120 },
-      {
-        name: "reference",
-        label: "Explicación de referencia",
-        description: "Explicación modelo tomada del material.",
-        kind: "text",
-        max: 800,
-        long: true,
-      },
-      {
-        name: "keyIdeas",
-        label: "Ideas clave",
-        description: "Ideas que una buena explicación debe mencionar.",
-        kind: "list",
-        min: 2,
-        max: 5,
-        itemMax: 120,
-      },
-    ],
-    { concept: text(120), reference: text(800), keyIdeas: z.array(text(120)).min(2).max(5) },
-  ),
 };
 
 export const catalogGames = Object.values(gameCatalog);

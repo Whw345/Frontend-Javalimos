@@ -26,11 +26,7 @@ export const quienSoy: GameDefinition<QuienSoyPayload, QuienSoyAnswer, QuienSoyS
   submitMode: "button",
   // Cada ronda revela una pista; el shell muestra el tiempo hasta la siguiente.
   getRounds: (payload) => ({ rounds: payload.clues.length, secondsPerRound: payload.secondsPerClue }),
-  shortcuts: (payload) => [
-    payload.mode === "options"
-      ? { keys: "1–4", label: t.shortcutOptions(payload.options.length) }
-      : { keys: "Enter", label: t.shortcutText },
-  ],
+  shortcuts: (payload) => [{ keys: "1–4", label: t.shortcutOptions(payload.options.length) }],
   Component: dynamic<GameProps<QuienSoyPayload, QuienSoyAnswer>>(() =>
     import("./QuienSoy").then((module) => module.QuienSoy),
   ),

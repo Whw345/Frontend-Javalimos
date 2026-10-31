@@ -5,7 +5,7 @@ import {
   createChallenge,
   getChallenge,
   getCourseProgress,
-  getWeekChallenges,
+  getStudentPath,
   revealHint,
   submitAnswer,
   type ClientChallengeSession,
@@ -14,7 +14,7 @@ import type { ChallengeResult, ChallengeSession, CreateChallengeBody, ProgressTo
 
 export const queryKeys = {
   progress: (courseId: string) => ["courses", courseId, "progress"] as const,
-  weekChallenges: (courseId: string) => ["courses", courseId, "challenges"] as const,
+  studentPath: (courseId: string) => ["courses", courseId, "challenges"] as const,
   challenge: (sessionId: string) => ["challenges", sessionId] as const,
   outcome: (sessionId: string) => ["challenges", sessionId, "outcome"] as const,
 };
@@ -36,10 +36,10 @@ export function useCourseProgress(courseId: string | undefined) {
   });
 }
 
-export function useWeekChallenges(courseId: string) {
+export function useStudentPath(courseId: string) {
   return useQuery({
-    queryKey: queryKeys.weekChallenges(courseId),
-    queryFn: () => getWeekChallenges(courseId),
+    queryKey: queryKeys.studentPath(courseId),
+    queryFn: () => getStudentPath(courseId),
     // Al volver de un reto debe aparecer como jugado.
     staleTime: 0,
     retry: false,

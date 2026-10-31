@@ -1,5 +1,5 @@
-import { PublishedChallenges } from "@/components/materials/PublishedChallenges";
+import { StudentPath } from "@/components/student/StudentPath";
 
 export default async function PracticePage({ params }: { params: Promise<{ courseId: string }> }) {
-  return <PublishedChallenges courseId={(await params).courseId} />;
+  return <StudentPath courseId={(await params).courseId} />;
 }

@@ -11,8 +11,7 @@ export type GameSlug =
   | "encuentra-error"
   | "quien-soy"
   | "intruso"
-  | "cual-mayor"
-  | "explicalo";
+  | "cual-mayor";
 
 export type Difficulty = 1 | 2 | 3;
 
@@ -87,8 +86,6 @@ export interface GameDefinition<TPayload, TAnswer, TSolution = unknown> {
   solutionSchema: ZodType<TSolution>;
   /** "auto": se envía al completar la interacción (o al terminar la última ronda). */
   submitMode: "button" | "auto";
-  /** Texto del botón mientras el servidor procesa (p. ej. "Evaluando…" cuando califica un LLM). */
-  submittingLabel?: string;
   /**
    * Si el juego tiene rondas con tiempo propio (Desliza, ¿Cuál es mayor?), el shell
    * muestra un temporizador por ronda en lugar del temporizador del reto.

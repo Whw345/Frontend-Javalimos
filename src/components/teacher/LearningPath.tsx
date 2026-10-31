@@ -11,11 +11,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { copy } from "@/content/copy";
 import { getGameDefinition } from "@/games/registry";
-import type { GameAccent } from "@/games/types";
 import { ApiError } from "@/lib/api/client";
 import { finishCourse, generateWeek, getCoursePath, type PathWeek } from "@/lib/api/teacher";
 import { cn } from "@/lib/utils/cn";
 import { formatDeadline } from "@/lib/utils/schedule";
+import { CURVE, nodeAccents, pathOffsets } from "@/components/game/pathStyle";
 import { CourseUpload } from "./CourseUpload";
 import { GameEditor } from "./GameEditor";
 import { TeacherHeader } from "./TeacherHeader";
@@ -25,17 +25,6 @@ const t = copy.teacher.path;
 /** Cada semana hace 2 o 3 llamadas y AI Gateway permite pocas por minuto a equipos sin pagos. */
 const MAX_PARALLEL_WEEKS = 1;
 const POLL_MS = 4000;
-
-/** Curva del camino (px desde el centro). */
-const CURVE = [0, -52, -84, -52, 0, 52, 84, 52];
-
-const nodeAccents: Record<GameAccent, string> = {
-  "cat-1": "bg-cat-1 shadow-[0_6px_0_color-mix(in_srgb,var(--color-cat-1)_55%,var(--color-bg))]",
-  "cat-2": "bg-cat-2 shadow-[0_6px_0_color-mix(in_srgb,var(--color-cat-2)_55%,var(--color-bg))]",
-  "cat-3": "bg-cat-3 shadow-[0_6px_0_color-mix(in_srgb,var(--color-cat-3)_55%,var(--color-bg))]",
-  "cat-4": "bg-cat-4 shadow-[0_6px_0_color-mix(in_srgb,var(--color-cat-4)_55%,var(--color-bg))]",
-  "cat-5": "bg-cat-5 shadow-[0_6px_0_color-mix(in_srgb,var(--color-cat-5)_55%,var(--color-bg))]",
-};
 
 const busy = (week: PathWeek) => week.generationStatus === "pending" || week.generationStatus === "running";
 
@@ -204,10 +193,7 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
   const finished = weeks?.filter((week) => !busy(week)).length ?? 0;
   const generating = finished < total;
   const hasGames = weeks?.some((week) => week.games.length > 0);
-  const offsets = (weeks ?? []).reduce<number[]>(
-    (result, week, index) => [...result, result[index]! + Math.max(week.games.length, 3)],
-    [0],
-  );
+  const offsets = pathOffsets((weeks ?? []).map((week) => week.games.length));
   return (
     <div className={cn(!embedded && "min-h-dvh bg-bg px-4 pt-6 md:px-6", !setupCompleted && "pb-28")}>
       <div className="mx-auto flex max-w-xl flex-col gap-8">

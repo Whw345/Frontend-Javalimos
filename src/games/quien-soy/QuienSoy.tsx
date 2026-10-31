@@ -4,7 +4,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useEffectEvent, useState } from "react";
 import { GameTile } from "@/components/game/GameTile";
 import { TextHint } from "@/components/game/TextHint";
-import { Input } from "@/components/ui/Input";
 import { copy } from "@/content/copy";
 import { useGameHotkeys, type HotkeyMap } from "@/lib/hooks/useGameHotkeys";
 import { DURATION, EASE } from "@/styles/motion";
@@ -23,36 +22,26 @@ export function QuienSoy({
   disabled,
   hint,
   onAnswerChange,
-  onSubmit,
   round,
 }: GameProps<QuienSoyPayload, QuienSoyAnswer>) {
   const reduceMotion = useReducedMotion();
   const [optionId, setOptionId] = useState<string | null>(null);
-  const [text, setText] = useState("");
   const clues = visibleClues(payload, round);
 
-  const buildAnswer = (): QuienSoyAnswer => ({
-    optionId,
-    text: payload.mode === "text" ? text : null,
-    cluesSeen: clues.length,
-  });
-
   const report = useEffectEvent(() => {
-    const answer = buildAnswer();
+    const answer: QuienSoyAnswer = { optionId, cluesSeen: clues.length };
     onAnswerChange(answer, hasAnswer(answer));
   });
-  useEffect(() => report(), [optionId, text, clues.length]);
+  useEffect(() => report(), [optionId, clues.length]);
 
   const choose = (id: string) => {
     if (!disabled) setOptionId((current) => (current === id ? null : id));
   };
 
   const hotkeys: HotkeyMap = {};
-  if (payload.mode === "options") {
-    payload.options.forEach((option, index) => {
-      hotkeys[String(index + 1)] = () => choose(option.id);
-    });
-  }
+  payload.options.forEach((option, index) => {
+    hotkeys[String(index + 1)] = () => choose(option.id);
+  });
   useGameHotkeys(hotkeys, { enabled: !disabled });
 
   return (
@@ -86,43 +75,21 @@ export function QuienSoy({
         )}
       </ol>
 
-      {payload.mode === "options" ? (
-        <ul aria-label={t.optionsLabel} className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
-          {payload.options.map((option, index) => (
-            <li key={option.id}>
-              <GameTile
-                state={optionId === option.id ? "selected" : "idle"}
-                shortcut={String(index + 1)}
-                disabled={disabled}
-                aria-pressed={optionId === option.id}
-                onClick={() => choose(option.id)}
-              >
-                {option.text}
-              </GameTile>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <label className="flex shrink-0 flex-col gap-2">
-          <span className="type-label text-text-secondary">{t.inputLabel}</span>
-          <Input
-            value={text}
-            maxLength={80}
-            disabled={disabled}
-            autoFocus
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={t.inputPlaceholder}
-            onChange={(event) => setText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && text.trim() !== "") {
-                event.preventDefault();
-                onSubmit(buildAnswer());
-              }
-            }}
-          />
-        </label>
-      )}
+      <ul aria-label={t.optionsLabel} className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-3">
+        {payload.options.map((option, index) => (
+          <li key={option.id}>
+            <GameTile
+              state={optionId === option.id ? "selected" : "idle"}
+              shortcut={String(index + 1)}
+              disabled={disabled}
+              aria-pressed={optionId === option.id}
+              onClick={() => choose(option.id)}
+            >
+              {option.text}
+            </GameTile>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

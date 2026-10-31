@@ -24,7 +24,7 @@ function mockTeacherApi(page: Page) {
         ? []
         : weekNumber === 1
           ? [game(gameId, "hueco"), game("g2", "parejas"), game("g3", "desliza")]
-          : [game("g4", "ordena"), game("g5", "intruso"), game("g6", "quien-soy"), game("g7", "explicalo")],
+          : [game("g4", "ordena"), game("g5", "intruso"), game("g6", "quien-soy")],
     }));
   const content = {
     before: "La ",
@@ -380,23 +380,39 @@ test("a published challenge renders the existing Hueco GameShell and submits for
         route.request().method() === "POST"
           ? session()
           : {
-              course: { name: "Biología", current_week: 1 },
-              challenges: [
+              course: { name: "Biología", current_week: 2 },
+              weeks: [
                 {
-                  id: "fixture",
-                  game: "hueco",
-                  difficulty: 1,
+                  weekNumber: 1,
+                  state: "past",
+                  topic: "Células",
+                  opensAt: null,
                   deadline: "2026-11-09T05:00:00.000Z",
-                  played: false,
-                  points: null,
+                  hiddenGames: 0,
+                  games: [
+                    { id: "fixture-missed", game: "ordena", difficulty: 1, status: "missed", points: null },
+                  ],
                 },
                 {
-                  id: "fixture-played",
-                  game: "parejas",
-                  difficulty: 1,
-                  deadline: "2026-11-09T05:00:00.000Z",
-                  played: true,
-                  points: 5,
+                  weekNumber: 2,
+                  state: "current",
+                  topic: "Fotosíntesis",
+                  opensAt: "2026-11-09T05:00:00.000Z",
+                  deadline: "2026-11-16T05:00:00.000Z",
+                  hiddenGames: 0,
+                  games: [
+                    { id: "fixture", game: "hueco", difficulty: 1, status: "available", points: null },
+                    { id: "fixture-played", game: "parejas", difficulty: 1, status: "played", points: 7 },
+                  ],
+                },
+                {
+                  weekNumber: 3,
+                  state: "future",
+                  topic: null,
+                  opensAt: "2026-11-16T05:00:00.000Z",
+                  deadline: "2026-11-23T05:00:00.000Z",
+                  hiddenGames: 2,
+                  games: [],
                 },
               ],
             },
@@ -420,11 +436,28 @@ test("a published challenge renders the existing Hueco GameShell and submits for
   });
   await page.goto(`/cursos/${courseId}/practicar`);
   await expect(page.getByRole("heading", { name: "Biología" })).toBeVisible();
-  await expect(page.getByText("Semana 1", { exact: true })).toBeVisible();
-  await expect(page.getByText("Disponibles hasta lun 9 nov, 00:00")).toBeVisible();
-  await expect(page.getByText("Jugado · +5 pts")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Jugar", exact: true })).toHaveCount(1);
-  await page.screenshot({ path: "test-results/practicar.png", fullPage: true });
+  await expect(page.getByText("Disponibles hasta lun 16 nov, 00:00")).toBeVisible();
+  await expect(page.getByText("Abre lun 16 nov, 00:00")).toBeVisible();
+  await expect(page.getByLabel("Reto oculto hasta que abra su semana")).toHaveCount(2);
+  await expect(page.getByText("Jugado · +7 pts").first()).toBeVisible();
+  await page.screenshot({ path: "test-results/camino-estudiante.png", fullPage: true });
+
+  for (const width of [320, 360, 768, 1280]) {
+    await page.setViewportSize({ width, height: 720 });
+    for (const name of ["Ordena, semana 1", "Hueco, semana 2", "Parejas, semana 2"]) {
+      const node = page.getByRole("button", { name });
+      await node.hover();
+      await expect(node).toHaveAttribute("aria-expanded", "true");
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+  }
+  const node = page.getByRole("button", { name: "Hueco, semana 2" });
+  await page.mouse.move(0, 0);
+  await expect(node).toHaveAttribute("aria-expanded", "false");
+  await node.hover();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: "test-results/casilla-abierta.png" });
   await page.getByRole("button", { name: "Jugar", exact: true }).click();
   await expect(page).toHaveURL(/\/reto\/fixture-session$/);
   await page.getByRole("button", { name: /mitocondria/i }).click();

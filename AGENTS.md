@@ -27,7 +27,8 @@ Somos un equipo construyendo para la hackatón DSC HACK una plataforma web de **
 
 ## Reglas de producto
 - Hasta **10 retos por estudiante por semana**.
-- Acierto: **10 puntos**; acierto con pista: **5 puntos**; error/tiempo agotado: **0 puntos**, con explicación, sin restar puntos.
+- Acierto: **10 puntos**; con pista: **5 como máximo**. Los puntos son la fracción resuelta del reto; responder mal vale **2 puntos** (1 con pista) y no responder, **0**, siempre con explicación y sin restar puntos.
+- Ningún juego pide redacción libre ni llama a un modelo durante o después del intento.
 - Ranking por sección/curso durante ciclo; dificultad progresiva y retos breves.
 - Cambio de pestaña que hace saltar el reto queda fuera del MVP.
 - La IA genera contenido **antes** del reto, nunca ofrece respuesta durante la ejecución.

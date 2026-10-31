@@ -17,6 +17,7 @@ import { POST as generate, PATCH as publish } from "@/app/api/courses/[courseId]
 import { GET as weekChallenges, POST as start } from "@/app/api/courses/[courseId]/challenges/route";
 import { GET as getSession } from "@/app/api/challenges/[sessionId]/route";
 import { firstMonday, weekWindow } from "@/lib/utils/schedule";
+import { quienSoyPayloadSchema, quienSoySolutionSchema } from "@/games/quien-soy/schema";
 import { POST as answer } from "@/app/api/challenges/[sessionId]/answer/route";
 import { POST as hint } from "@/app/api/challenges/[sessionId]/hint/route";
 
@@ -227,8 +228,10 @@ it("enforces quota, timeout, hint points and replay rules in PostgreSQL", async 
     [student],
   );
   const id = first.rows[0]!.value.id;
-  await db.query("update challenge_sessions set deadline = now() - interval '1 second' where id = $1", [id]);
-  const expired = await db.query<{ value: unknown }>("select finish_challenge($1,$2,true,null) as value", [
+  await db.query("update challenge_sessions set deadline = now() - interval '10 seconds' where id = $1", [
+    id,
+  ]);
+  const expired = await db.query<{ value: unknown }>("select finish_challenge($1,$2,1,null) as value", [
     id,
     student,
   ]);
@@ -240,7 +243,7 @@ it("enforces quota, timeout, hint points and replay rules in PostgreSQL", async 
     `select start_challenge('${courseId}',$1,'hueco',1) as value`,
     [student],
   );
-  const correct = await db.query<{ value: unknown }>("select finish_challenge($1,$2,true,null) as value", [
+  const correct = await db.query<{ value: unknown }>("select finish_challenge($1,$2,1,null) as value", [
     second.rows[0]!.value.id,
     student,
   ]);
@@ -507,6 +510,7 @@ it("lets an assigned student play only the current week, from before the first M
   const week1 = "99999999-9999-4999-8999-999999999991";
   const week2 = "99999999-9999-4999-8999-999999999992";
   const draft = "99999999-9999-4999-8999-999999999993";
+  const missed = "99999999-9999-4999-8999-999999999994";
   const context = { params: Promise.resolve({ courseId: id }) };
   const list = () => weekChallenges(new Request("http://localhost"), context);
   const open = (challengeId: string) =>
@@ -537,8 +541,18 @@ it("lets an assigned student play only the current week, from before the first M
 
   const before = await (await list()).json();
   expect(before.course).toEqual({ name: "Semanal", current_week: 1 });
-  expect(before.challenges).toMatchObject([{ id: week1, played: false, points: null }]);
-  expect(JSON.stringify(before)).not.toContain("optionId");
+  expect(before.weeks).toMatchObject([
+    {
+      weekNumber: 1,
+      state: "current",
+      topic: "Uno",
+      hiddenGames: 0,
+      games: [{ id: week1, status: "available", points: null }],
+    },
+    { weekNumber: 2, state: "future", topic: null, hiddenGames: 1, games: [] },
+  ]);
+  expect(before.weeks[1].opensAt).not.toBeNull();
+  for (const secret of ["optionId", week2, "Dos"]) expect(JSON.stringify(before)).not.toContain(secret);
   const listed = await (await listCourses()).json();
   expect(listed.courses.find((item: { id: string }) => item.id === id)).toMatchObject({
     role: "student",
@@ -555,9 +569,12 @@ it("lets an assigned student play only the current week, from before the first M
     sessionContext(session.sessionId),
   );
   expect(await answered.json()).toMatchObject({ correct: true, pointsAwarded: 10 });
-  expect((await (await list()).json()).challenges).toMatchObject([{ id: week1, played: true, points: 10 }]);
+  expect((await (await list()).json()).weeks[0].games).toMatchObject([
+    { id: week1, status: "played", points: 10 },
+  ]);
   expect((await open(week1)).status).toBe(422);
 
+  await insertGame(missed, 1, "published", "null", "now() - interval '1 day'");
   await db.exec(`
     update courses set starts_on = current_date - 7 where id = '${id}';
     update generated_challenges set opens_at = now() - interval '1 day' where id = '${week2}';
@@ -565,7 +582,23 @@ it("lets an assigned student play only the current week, from before the first M
   `);
   const next = await (await list()).json();
   expect(next.course.current_week).toBe(2);
-  expect(next.challenges).toMatchObject([{ id: week2, played: false }]);
+  expect(next.weeks).toMatchObject([
+    { state: "past", topic: "Uno" },
+    { state: "current", topic: "Dos", hiddenGames: 0, games: [{ id: week2, status: "available" }] },
+  ]);
+  expect(next.weeks[0].games).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: week1, status: "played", points: 10 }),
+      expect.objectContaining({ id: missed, status: "missed", points: null }),
+    ]),
+  );
+
+  const nextSession = await (await open(week2)).json();
+  const wrong = await answer(
+    request("answer", "POST", { answer: { optionId: "b" } }),
+    sessionContext(nextSession.sessionId),
+  );
+  expect(await wrong.json()).toMatchObject({ correct: false, pointsAwarded: 2, totals: { points: 12 } });
 
   state.userId = outsider;
   expect((await list()).status).toBe(403);
@@ -595,4 +628,76 @@ it("lets only listed teachers create courses, whatever the browser sends", async
   await db.exec("set role authenticated");
   await expect(db.query("select user_id from teachers")).rejects.toThrow("permission denied");
   await db.exec("reset role");
+});
+
+it("scores the fraction solved, caps it with a hint and accepts what arrives right at the deadline", async () => {
+  const stored = await db.query<{ id: string }>(
+    "select id from generated_challenges where course_id = $1 limit 1",
+    [courseId],
+  );
+  async function finishWith(score: number, deadline: string, hintUsed = false) {
+    const session = await db.query<{ id: string }>(
+      `insert into challenge_sessions(user_id,course_id,week_number,challenge_id,deadline,hint_used)
+      values ($1,$2,1,$3,now() + interval '${deadline}',$4) returning id`,
+      [student, courseId, stored.rows[0]!.id, hintUsed],
+    );
+    const result = await db.query<{ value: unknown }>(
+      "select finish_challenge($1,$2,$3::numeric,null) as value",
+      [session.rows[0]!.id, student, score],
+    );
+    return result.rows[0]!.value;
+  }
+  expect(await finishWith(0.6, "1 minute")).toEqual({ correct: false, pointsAwarded: 6, timedOut: false });
+  expect(await finishWith(0.6, "1 minute", true)).toEqual({
+    correct: false,
+    pointsAwarded: 3,
+    timedOut: false,
+  });
+  expect(await finishWith(0.2, "1 minute")).toMatchObject({ pointsAwarded: 2 });
+  expect(await finishWith(0, "1 minute")).toMatchObject({ pointsAwarded: 0 });
+  expect(await finishWith(0.5, "-1 second")).toEqual({ correct: false, pointsAwarded: 5, timedOut: true });
+  expect(await finishWith(1, "-10 seconds")).toEqual({ correct: false, pointsAwarded: 0, timedOut: true });
+});
+
+it("discards explain games and turns typed quien-soy into options, keeping what was played", async () => {
+  const insertCopy = (game: string, payload: unknown, solution: unknown, content: unknown) =>
+    db.query<{ id: string }>(
+      `insert into generated_challenges(course_id,week_number,game,difficulty,payload,solution,hint,explanation,source,source_document_id,evidence,decision,status,content)
+      select course_id,week_number,$1,3,$2,$3,hint,explanation,source,source_document_id,evidence,decision,'published',$4
+      from generated_challenges where game = 'hueco' limit 1 returning id`,
+      [game, payload, solution, content],
+    );
+  const explain = await insertCopy("explicalo", { concept: "ATP", maxChars: 100 }, {}, {});
+  const explainId = explain.rows[0]!.id;
+  await db.query(
+    `insert into challenge_sessions(user_id,course_id,week_number,challenge_id,deadline,points)
+    select $1,course_id,week_number,id,now(),10 from generated_challenges where id = $2`,
+    [student, explainId],
+  );
+  const typed = await insertCopy(
+    "quien-soy",
+    { clues: ["Vaga", "Clara"], secondsPerClue: 6, mode: "text", options: [] },
+    { answer: "Meiosis", optionId: null, explanation: "Forma gametos." },
+    { answer: "Meiosis", distractors: ["Mitosis", "Fisión", "Gemación"] },
+  );
+  await db.exec(
+    await readFile(
+      new URL("../../../supabase/migrations/202610300009_remove_free_text.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const rows = await db.query<{ id: string; status: string; payload: unknown; solution: unknown }>(
+    "select id, status, payload, solution from generated_challenges where id = any($1)",
+    [[explainId, typed.rows[0]!.id]],
+  );
+  expect(rows.rows.find((row) => row.id === explainId)!.status).toBe("discarded");
+  const converted = rows.rows.find((row) => row.id !== explainId)!;
+  expect(converted.status).toBe("published");
+  expect(converted.payload).not.toHaveProperty("mode");
+  const { options } = quienSoyPayloadSchema.parse(converted.payload);
+  const { optionId } = quienSoySolutionSchema.parse(converted.solution);
+  expect(options.map((option) => option.text).sort()).toEqual(["Fisión", "Gemación", "Meiosis", "Mitosis"]);
+  expect(options.find((option) => option.id === optionId)!.text).toBe("Meiosis");
+  const played = await db.query("select id from challenge_sessions where challenge_id = $1", [explainId]);
+  expect(played.rows).toHaveLength(1);
 });

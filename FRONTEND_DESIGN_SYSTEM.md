@@ -16,7 +16,7 @@
 
 1. **Recordar, no reconocer.** Cada pantalla de juego obliga a producir o decidir, nunca a releer. Nada de material de consulta visible durante un reto.
 2. **Rápido por diseño.** Un reto dura entre 20 y 90 segundos. El estudiante lo juega entre tareas en su laptop, o desde el celular en un tiempo muerto, y sale con puntos.
-3. **Errar no castiga, enseña.** Una respuesta incorrecta da 0 puntos y una explicación clara. Nunca se restan puntos ni se usa rojo agresivo a pantalla completa.
+3. **Errar no castiga, enseña.** Una respuesta incorrecta suma lo que tuvo de correcto, al menos 2 puntos, y trae una explicación clara. Nunca se restan puntos ni se usa rojo agresivo a pantalla completa.
 4. **Progreso siempre visible.** Puntos, racha, retos restantes de la semana y posición en el leaderboard deben verse en máximo un toque.
 5. **Un solo foco en el juego.** Dentro de un reto solo existen el enunciado, la interacción, el temporizador y el botón de acción. Las ilustraciones y decoraciones viven fuera del área de juego, y el cuy frontal solo aparece en las transiciones del reto, nunca mientras corre el temporizador (§3.2).
 6. **Desktop como base, responsive siempre.** Cada pantalla se diseña primero a 1280 × 720 (laptop) y luego se adapta a tablet (768) y móvil (360). Ninguna pantalla se da por terminada sin sus tres versiones. Ver §6.0 para la diferencia entre "base de diseño" y "estrategia de CSS".
@@ -538,7 +538,6 @@ Cada minijuego tiene un ícono y un color de acento fijo, que se usan en tarjeta
 | ¿Quién soy? | `UserRoundSearch` | `cat-2` |
 | El intruso | `ShieldQuestion` | `cat-3` |
 | ¿Cuál es mayor? | `Scale` | `cat-4` |
-| Explícalo en una frase | `MessageSquareText` | `cat-5` |
 
 ### 8.3 Ilustración
 
@@ -636,10 +635,9 @@ Tiempos y cantidades son el punto de partida para la **dificultad progresiva** (
 | 4 | **Dos cajas** | Tarjetas caen una a una; arrastrar o tocar caja A / B. | 6 tarjetas, 6 s c/u | 8, 5 s | 10, 4 s | auto | `DropZone` ×2 con color + letra |
 | 5 | **Hueco** | Oración con un espacio; tocar una de 3 fichas (o arrastrar). | 3 opciones, 20 s | 3 opciones, 15 s | 4 opciones, 12 s | auto al elegir | `BlankSentence`, `GameTile` |
 | 6 | **Encuentra el error** | Solución de 5 líneas; tocar la incorrecta. | 4 líneas, 40 s | 5 líneas, 35 s | 6 líneas, 30 s | auto | `CodeLine` (fuente mono, numeradas) |
-| 7 | **¿Quién soy?** | Pistas se revelan cada X s de vaga a clara; escribir o elegir respuesta. | 4 opciones, pista cada 8 s | 4 opciones, cada 6 s | texto libre, cada 6 s | botón | `ClueReveal`, `Input` / opciones |
+| 7 | **¿Quién soy?** | Pistas se revelan cada X s de vaga a clara; elegir la respuesta. | 4 opciones, pista cada 8 s | 4 opciones, cada 6 s | 4 opciones, cada 5 s | botón | `ClueReveal`, opciones |
 | 8 | **El intruso** | 4 fichas en grid 2×2; tocar la que no pertenece. | 4 fichas, 20 s | 4, 15 s | 4 conceptos cercanos, 12 s | auto | Grid de `GameTile` |
 | 9 | **¿Cuál es mayor?** | 2 tarjetas lado a lado (apiladas en móvil); tocar la mayor / anterior / más rápida. | 5 rondas, 8 s | 6, 6 s | 8, 5 s | auto (por ronda) | `CompareCard` |
-| 10 | **Explícalo en una frase** | Escribir la idea; un LLM la compara con la fuente. | 60 s, 150 caracteres | 50 s, 120 | 45 s, 100 | botón | `Textarea` con contador, estado "Evaluando…" |
 
 **Notas por juego**
 
@@ -649,7 +647,6 @@ Tiempos y cantidades son el punto de partida para la **dificultad progresiva** (
 - **Ordena:** la lista muestra números fijos (1, 2, 3…) y las tarjetas se colocan en ellos. Teclado: espacio para tomar, flechas para mover, espacio para soltar (dnd-kit `KeyboardSensor`).
 - **Encuentra el error:** si el curso no es de programación, las líneas se muestran en `body-lg` (no mono).
 - **¿Quién soy?:** la tabla original propone más puntos si se adivina antes; ver decisión pendiente en §20.
-- **Explícalo en una frase:** la evaluación del LLM tarda; el temporizador se detiene al enviar y se muestra un estado de carga con `Skeleton` en el `FeedbackSheet`. El LLM evalúa **después** del intento: coherente con "la IA explica después, nunca durante".
 
 ---
 
@@ -660,9 +657,9 @@ Reglas definidas en el documento de contexto; el frontend las **muestra**, el ba
 | Regla | Valor | UI |
 | --- | --- | --- |
 | Acierto | +10 puntos | `FeedbackSheet` éxito + "+10 ✨" animado |
-| Acierto con pista | +5 puntos | Botón de pista muestra "(−5 pts)" antes de usarla |
-| Error | 0 puntos, nunca se restan | `FeedbackSheet` con explicación del error (usa `confusiones` del átomo) |
-| Tiempo agotado | Igual que error | Título "Se acabó el tiempo" + explicación |
+| Acierto con pista | +5 puntos como máximo | Botón de pista muestra "(−5 pts)" antes de usarla |
+| Error | La fracción resuelta sobre 10 (sobre 5 con pista), mínimo 2 si respondió. Nunca se restan | `FeedbackSheet` con los puntos sumados y la explicación del error (usa `confusiones` del átomo) |
+| Tiempo agotado | Suma lo respondido; sin respuesta, 0 puntos | Título "Se acabó el tiempo" + explicación |
 | Límite semanal | 10 retos | `WeeklyQuota`; al llegar a 10, el botón "Jugar" se desactiva con el texto "Vuelve el lunes" y la fecha |
 | Cambio de pestaña | **Versión futura** | Ver abajo |
 

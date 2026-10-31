@@ -38,7 +38,13 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
 
   const { session, result, hintUsed, elapsedMs, totalMs } = outcome;
   const definition = getGameDefinition(session.game);
-  const stars = computeStars({ correct: result.correct, hintUsed, elapsedMs, totalMs });
+  const stars = computeStars({
+    correct: result.correct,
+    points: result.pointsAwarded,
+    hintUsed,
+    elapsedMs,
+    totalMs,
+  });
   const remaining = Math.max(0, result.totals.weeklyLimit - result.totals.weeklyPlayed);
   const playHref = `/cursos/${session.courseId}/${API_MOCKING_ENABLED ? "jugar" : "practicar"}`;
 

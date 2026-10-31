@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildReview, hasAnswer, isTextMatch, normalize, visibleClues } from "./logic";
+import { buildReview, hasAnswer, visibleClues } from "./logic";
 import type { QuienSoyPayload, QuienSoySolution } from "./schema";
 
 const payload: QuienSoyPayload = {
   clues: ["Pista vaga", "Pista media", "Pista clara"],
   secondsPerClue: 6,
-  mode: "options",
   options: [
     { id: "o-1", text: "Mitosis" },
     { id: "o-2", text: "Meiosis" },
@@ -20,31 +19,21 @@ describe("¿Quién soy?", () => {
     expect(visibleClues(payload, 9)).toHaveLength(3);
   });
 
-  it("normaliza tildes, mayúsculas y espacios", () => {
-    expect(normalize("  Citocinésis   celular ")).toBe("citocinesis celular");
-    expect(isTextMatch("MEIÓSIS", "Meiosis")).toBe(true);
-    expect(isTextMatch("   ", "Meiosis")).toBe(false);
-    expect(isTextMatch(null, "Meiosis")).toBe(false);
+  it("hasAnswer exige una opción", () => {
+    expect(hasAnswer({ optionId: null, cluesSeen: 1 })).toBe(false);
+    expect(hasAnswer({ optionId: "o-1", cluesSeen: 1 })).toBe(true);
   });
 
-  it("hasAnswer acepta opción o texto no vacío", () => {
-    expect(hasAnswer({ optionId: null, text: " ", cluesSeen: 1 })).toBe(false);
-    expect(hasAnswer({ optionId: "o-1", text: null, cluesSeen: 1 })).toBe(true);
-    expect(hasAnswer({ optionId: null, text: "meiosis", cluesSeen: 1 })).toBe(true);
-  });
-
-  it("revisión con opciones y con texto libre", () => {
-    expect(buildReview(payload, { optionId: "o-2", text: null, cluesSeen: 2 }, solution)).toMatchObject({
+  it("revisión de la opción elegida", () => {
+    expect(buildReview(payload, { optionId: "o-2", cluesSeen: 2 }, solution)).toMatchObject({
       isCorrect: true,
+      given: "Meiosis",
       cluesSeen: 2,
     });
-    const textPayload = { ...payload, mode: "text" as const, options: [] };
-    expect(
-      buildReview(
-        textPayload,
-        { optionId: null, text: "meiosis ", cluesSeen: 3 },
-        { ...solution, optionId: null },
-      ),
-    ).toMatchObject({ isCorrect: true, given: "meiosis" });
+    expect(buildReview(payload, { optionId: "o-1", cluesSeen: 3 }, solution)).toMatchObject({
+      isCorrect: false,
+      given: "Mitosis",
+    });
+    expect(buildReview(payload, null, solution)).toMatchObject({ isCorrect: false, given: null });
   });
 });

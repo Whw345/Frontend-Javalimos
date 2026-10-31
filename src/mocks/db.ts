@@ -14,7 +14,6 @@ import { createCualMayorChallenge } from "./games/cual-mayor";
 import { createDeslizaChallenge } from "./games/desliza";
 import { createDosCajasChallenge } from "./games/dos-cajas";
 import { createEncuentraErrorChallenge } from "./games/encuentra-error";
-import { createExplicaloChallenge } from "./games/explicalo";
 import { createHuecoChallenge } from "./games/hueco";
 import { createIntrusoChallenge } from "./games/intruso";
 import { createOrdenaChallenge } from "./games/ordena";
@@ -50,7 +49,6 @@ const generators: Record<GameSlug, (difficulty: Difficulty) => MockChallenge> = 
   "quien-soy": (difficulty) => createQuienSoyChallenge(biologyWeek5Atoms, ejemplosPorAtomo, difficulty),
   intruso: (difficulty) => createIntrusoChallenge(biologyWeek5Atoms, otherUnitConcepts, difficulty),
   "cual-mayor": (difficulty) => createCualMayorChallenge(valuedAtoms, valueQuestions, difficulty),
-  explicalo: (difficulty) => createExplicaloChallenge(biologyWeek5Atoms, difficulty),
 };
 
 export function getProgress(courseId: string): ProgressTotals {

@@ -62,7 +62,6 @@ export const handlers = [
     }
 
     const { answer } = (await request.json()) as { answer: unknown };
-    if (stored.challenge.gradingDelayMs) await delay(stored.challenge.gradingDelayMs);
     const grade = stored.challenge.grade(answer);
     const pointsAwarded = grade.correct ? (stored.hintUsed ? POINTS_CORRECT_WITH_HINT : POINTS_CORRECT) : 0;
 

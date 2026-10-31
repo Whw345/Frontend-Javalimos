@@ -16,7 +16,6 @@ export const gameSlugSchema = z.enum([
   "quien-soy",
   "intruso",
   "cual-mayor",
-  "explicalo",
 ]);
 
 export const difficultySchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
@@ -48,7 +47,7 @@ export type ProgressTotals = z.infer<typeof progressTotalsSchema>;
 
 export const challengeResultSchema = z.object({
   correct: z.boolean(),
-  pointsAwarded: z.union([z.literal(0), z.literal(5), z.literal(10)]),
+  pointsAwarded: z.number().int().min(0).max(10),
   timedOut: z.boolean(),
   /** Se valida después con el solutionSchema del juego. */
   correctAnswer: z.unknown(),
@@ -65,19 +64,30 @@ export const hintResponseSchema = z.object({
 });
 export type HintResponse = z.infer<typeof hintResponseSchema>;
 
-export const weekChallengeSchema = z.object({
+/** Una casilla del camino. Las de semanas futuras no llegan: solo se cuentan. */
+export const pathGameSchema = z.object({
   id: z.string(),
   game: gameSlugSchema,
   difficulty: difficultySchema,
-  deadline: z.iso.datetime().nullable(),
-  played: z.boolean(),
+  status: z.enum(["available", "played", "missed"]),
   points: z.number().int().nullable(),
 });
-export type WeekChallenge = z.infer<typeof weekChallengeSchema>;
+export type PathGame = z.infer<typeof pathGameSchema>;
 
-export const weekChallengesSchema = z.object({
+export const studentWeekSchema = z.object({
+  weekNumber: z.number().int(),
+  state: z.enum(["past", "current", "future"]),
+  topic: z.string().nullable(),
+  opensAt: z.iso.datetime().nullable(),
+  deadline: z.iso.datetime().nullable(),
+  hiddenGames: z.number().int(),
+  games: z.array(pathGameSchema),
+});
+export type StudentWeek = z.infer<typeof studentWeekSchema>;
+
+export const studentPathSchema = z.object({
   course: z.object({ name: z.string(), current_week: z.number().int() }),
-  challenges: z.array(weekChallengeSchema),
+  weeks: z.array(studentWeekSchema),
 });
 
 export const apiErrorSchema = z.object({ code: z.string(), message: z.string() });

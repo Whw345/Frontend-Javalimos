@@ -1,13 +1,13 @@
 import { checkOrigin, handleApi } from "@/lib/server/errors";
 import { requireCourse } from "@/lib/server/supabase";
-import { getWeekChallenges, startChallenge } from "@/lib/server/challenges";
+import { getStudentPath, startChallenge } from "@/lib/server/challenges";
 
 type Context = { params: Promise<{ courseId: string }> };
 export async function GET(_request: Request, { params }: Context) {
   return handleApi(async () => {
     const { courseId } = await params;
     const { userId } = await requireCourse(courseId);
-    return getWeekChallenges(courseId, userId);
+    return getStudentPath(courseId, userId);
   });
 }
 export async function POST(request: Request, { params }: Context) {

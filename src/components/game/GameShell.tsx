@@ -118,7 +118,8 @@ export function GameShell({ definition, payload }: GameShellProps) {
   };
 
   const goToResult = () => router.push(`/reto/${session.sessionId}/resultado`);
-  const leave = () => router.push(`/cursos/${session.courseId}/${API_MOCKING_ENABLED ? "jugar" : "practicar"}`);
+  const leave = () =>
+    router.push(`/cursos/${session.courseId}/${API_MOCKING_ENABLED ? "jugar" : "practicar"}`);
 
   useGameHotkeys(
     {
@@ -188,7 +189,7 @@ export function GameShell({ definition, payload }: GameShellProps) {
             showSubmit={definition.submitMode === "button"}
             canSubmit={isPlaying && isComplete}
             submitting={status === "submitting" && !submitError}
-            submittingLabel={definition.submittingLabel ?? copy.shell.submitting}
+            submittingLabel={copy.shell.submitting}
             onSubmit={submit}
             submitError={submitError}
             onRetrySubmit={sendAnswer}

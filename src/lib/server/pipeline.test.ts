@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { extractPdf } from "./pdf";
 import { suggestWeeks, topicFromFilename, weeksSchema } from "./materials";
 import { buildChallenge, generateForContext, isSupportedEvidence, spacedBlank } from "./generation";
-import { gradeAnswer, gradeExplanation, publicSession } from "./challenges";
+import { gradeAnswer, publicSession } from "./challenges";
 import { deslizaSolutionSchema } from "@/games/desliza/schema";
 import { encuentraErrorPayloadSchema, encuentraErrorSolutionSchema } from "@/games/encuentra-error/schema";
 import { huecoPayloadSchema } from "@/games/hueco/schema";
@@ -12,6 +12,7 @@ import { MAX_PDF_BYTES } from "@/lib/config";
 import { gameCatalog } from "@/lib/games/catalog";
 import { decisionAnswers } from "@/test/decisions";
 import { parejasSolutionSchema } from "@/games/parejas/schema";
+import { quienSoyPayloadSchema, quienSoySolutionSchema } from "@/games/quien-soy/schema";
 import { ordenaSolutionSchema } from "@/games/ordena/schema";
 
 const generated = {
@@ -84,11 +85,6 @@ const allGames: Record<string, Record<string, unknown>> = {
       choice: "right",
     })),
   },
-  explicalo: {
-    concept: "Mitocondria",
-    reference: "Organelo que produce ATP.",
-    keyIdeas: ["ATP", "respiracion"],
-  },
 };
 export async function fixture(name: string) {
   return new File([await readFile(new URL(`../../../fixtures/${name}`, import.meta.url))], name, {
@@ -138,8 +134,9 @@ describe("PDF to playable challenge pipeline", () => {
     expect(session).not.toHaveProperty("evidence");
     const payload = huecoPayloadSchema.parse(session.payload);
     const correct = payload.options.find((option) => option.text === "mitocondria")!;
-    expect(gradeAnswer("hueco", challenge.solution, { optionId: correct.id })).toBe(true);
-    expect(gradeAnswer("hueco", challenge.solution, { optionId: "wrong" })).toBe(false);
+    expect(gradeAnswer("hueco", challenge.solution, { optionId: correct.id })).toBe(1);
+    expect(gradeAnswer("hueco", challenge.solution, { optionId: "wrong" })).toBe(0.2);
+    expect(gradeAnswer("hueco", challenge.solution, null)).toBe(0);
     expect(challenge.source).toEqual({ documento: "teoria.pdf" });
   });
 
@@ -170,19 +167,28 @@ describe("PDF to playable challenge pipeline", () => {
         { concept: "C", definition: "Tres" },
       ],
     });
-    expect(gradeAnswer("parejas", pairs.solution, { pairs: pairs.solution })).toBe(true);
+    expect(gradeAnswer("parejas", pairs.solution, { pairs: pairs.solution })).toBe(1);
     const pairSolution = parejasSolutionSchema.parse(pairs.solution);
     expect(
       gradeAnswer("parejas", pairs.solution, { pairs: [pairSolution[0], pairSolution[0], pairSolution[0]] }),
-    ).toBe(false);
+    ).toBe(0);
+    expect(gradeAnswer("parejas", pairs.solution, { pairs: pairSolution.slice(0, 2) })).toBeCloseTo(2 / 3);
+    expect(
+      gradeAnswer("parejas", pairs.solution, {
+        pairs: [{ conceptId: pairSolution[0]!.conceptId, definitionId: pairSolution[1]!.definitionId }],
+      }),
+    ).toBe(0.2);
+    expect(gradeAnswer("parejas", pairs.solution, { pairs: [] })).toBe(0);
     const order = buildChallenge({
       ...generated,
       game: "ordena",
       steps: ["Inicio", "Segundo", "Tercero", "Final"],
     });
     const orderSolution = ordenaSolutionSchema.parse(order.solution);
-    expect(gradeAnswer("ordena", order.solution, { order: orderSolution.order })).toBe(true);
-    expect(gradeAnswer("ordena", order.solution, { order: [...orderSolution.order].reverse() })).toBe(false);
+    expect(gradeAnswer("ordena", order.solution, { order: orderSolution.order })).toBe(1);
+    expect(gradeAnswer("ordena", order.solution, { order: [...orderSolution.order].reverse() })).toBe(0.2);
+    const [first, second, third, fourth] = orderSolution.order;
+    expect(gradeAnswer("ordena", order.solution, { order: [first, second, fourth, third] })).toBe(0.5);
   });
 
   it("retries unsupported evidence and rejects invented source content", async () => {
@@ -253,31 +259,22 @@ describe("PDF to playable challenge pipeline", () => {
         elapsedMs: 1,
       })),
     });
-    expect(gradeAnswer("desliza", slide, verdicts(1))).toBe(true);
-    expect(gradeAnswer("desliza", slide, verdicts(2))).toBe(false);
+    expect(gradeAnswer("desliza", slide, verdicts(1))).toBe(1);
+    expect(gradeAnswer("desliza", slide, verdicts(2))).toBe(0.5);
+    expect(gradeAnswer("desliza", slide, verdicts(4))).toBe(0.2);
     const line = buildChallenge({ ...allGames["encuentra-error"], ...args, game: "encuentra-error" });
     const lineSolution = encuentraErrorSolutionSchema.parse(line.solution);
     const payload = encuentraErrorPayloadSchema.parse(line.payload);
     expect(lineSolution.lineId).toBe(payload.lines[2]!.id);
-    expect(gradeAnswer("encuentra-error", line.solution, { lineId: lineSolution.lineId })).toBe(true);
-    expect(gradeAnswer("encuentra-error", line.solution, { lineId: payload.lines[0]!.id })).toBe(false);
-    const free = buildChallenge({ ...allGames["quien-soy"], ...args, game: "quien-soy" }, 3);
-    expect(
-      gradeAnswer("quien-soy", free.solution, { optionId: null, text: " mitocondria ", cluesSeen: 2 }),
-    ).toBe(true);
-  });
-
-  it("evaluates an explanation after the attempt and ignores ideas outside the rubric", async () => {
-    const solution = { reference: "Produce ATP.", keyIdeas: ["ATP", "respiracion"] };
-    const generate = vi.fn().mockResolvedValue({ matched: ["ATP", "inventada"] });
-    const graded = await gradeExplanation(solution, { text: "Hace ATP" }, { generate, complete: vi.fn() });
-    expect(graded).toEqual({
-      correct: true,
-      solution: { reference: "Produce ATP.", matched: ["ATP"], missing: ["respiracion"] },
-    });
-    const blank = await gradeExplanation(solution, { text: "  " }, { generate, complete: vi.fn() });
-    expect(blank.correct).toBe(false);
-    expect(generate).toHaveBeenCalledOnce();
+    expect(gradeAnswer("encuentra-error", line.solution, { lineId: lineSolution.lineId })).toBe(1);
+    expect(gradeAnswer("encuentra-error", line.solution, { lineId: payload.lines[0]!.id })).toBe(0.2);
+    const guess = buildChallenge({ ...allGames["quien-soy"], ...args, game: "quien-soy" }, 3);
+    const guessSolution = quienSoySolutionSchema.parse(guess.solution);
+    expect(quienSoyPayloadSchema.parse(guess.payload).options.length).toBe(4);
+    expect(gradeAnswer("quien-soy", guess.solution, { optionId: guessSolution.optionId, cluesSeen: 2 })).toBe(
+      1,
+    );
+    expect(gradeAnswer("quien-soy", guess.solution, { optionId: null, cluesSeen: 4 })).toBe(0);
   });
 
   it("accepts several verbatim quotes but no invented or trivial fragment", () => {

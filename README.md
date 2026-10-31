@@ -254,7 +254,7 @@ La API key se utiliza solamente desde `src/lib/decision/provider.ts`. Nunca debe
 
 ## Juegos implementados
 
-Los 10 de la tabla de plantillas, cada uno con su `README.md`:
+Los 9 de la tabla de plantillas, cada uno con su `README.md`:
 
 | #   | Juego                  | Carpeta                     |
 | --- | ---------------------- | --------------------------- |
@@ -267,7 +267,6 @@ Los 10 de la tabla de plantillas, cada uno con su `README.md`:
 | 7   | ¿Quién soy?            | `src/games/quien-soy`       |
 | 8   | El intruso             | `src/games/intruso`         |
 | 9   | ¿Cuál es mayor?        | `src/games/cual-mayor`      |
-| 10  | Explícalo en una frase | `src/games/explicalo`       |
 
 Para cambiar o agregar un juego: crea `src/games/<slug>/` con `index.ts` (`GameDefinition`), componente, `schema.ts`, `logic.ts` + tests, `fixtures.ts` y `README.md`; regístralo en `src/games/registry.ts` y agrega su generador en `src/mocks/db.ts`.
 

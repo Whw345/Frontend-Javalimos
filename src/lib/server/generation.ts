@@ -9,8 +9,6 @@ import { DOS_CAJAS_LEVELS } from "@/games/dos-cajas/logic";
 import { dosCajasPayloadSchema, dosCajasSolutionSchema } from "@/games/dos-cajas/schema";
 import { ENCUENTRA_ERROR_LEVELS } from "@/games/encuentra-error/logic";
 import { encuentraErrorPayloadSchema, encuentraErrorSolutionSchema } from "@/games/encuentra-error/schema";
-import { EXPLICALO_LEVELS } from "@/games/explicalo/logic";
-import { explicaloPayloadSchema } from "@/games/explicalo/schema";
 import { HUECO_LEVELS } from "@/games/hueco/logic";
 import { huecoPayloadSchema, huecoSolutionSchema } from "@/games/hueco/schema";
 import { INTRUSO_LEVELS } from "@/games/intruso/logic";
@@ -201,19 +199,18 @@ export function buildChallenge(input: unknown, difficulty: Difficulty = 1) {
   if (game === "quien-soy") {
     unique([generated.answer, ...generated.distractors]);
     assertHidden(generated.answer, generated.clues);
-    const { mode, secondsPerClue } = QUIEN_SOY_LEVELS[difficulty];
+    const { secondsPerClue } = QUIEN_SOY_LEVELS[difficulty];
     const options = withIds([generated.answer, ...generated.distractors]);
     return {
       game,
       payload: quienSoyPayloadSchema.parse({
         clues: generated.clues,
         secondsPerClue,
-        mode,
-        options: mode === "options" ? shuffle(options) : [],
+        options: shuffle(options),
       }),
       solution: quienSoySolutionSchema.parse({
         answer: generated.answer,
-        optionId: mode === "options" ? options[0]!.id : null,
+        optionId: options[0]!.id,
         explanation,
       }),
       hint: {
@@ -259,14 +256,7 @@ export function buildChallenge(input: unknown, difficulty: Difficulty = 1) {
       timeLimitSeconds: roundsLimit(rounds.length, secondsPerRound),
     };
   }
-  const { seconds, maxChars } = EXPLICALO_LEVELS[difficulty];
-  return {
-    game,
-    payload: explicaloPayloadSchema.parse({ concept: generated.concept, maxChars }),
-    solution: { reference: generated.reference, keyIdeas: generated.keyIdeas as string[] },
-    hint: { text: `Usa ideas como «${generated.keyIdeas.slice(0, 2).join("» o «")}».` },
-    timeLimitSeconds: seconds,
-  };
+  throw new Error("Unknown game.");
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

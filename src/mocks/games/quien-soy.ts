@@ -12,7 +12,7 @@ export function createQuienSoyChallenge(
   ejemplos: Record<string, string[]>,
   difficulty: Difficulty,
 ): MockChallenge {
-  const { mode, secondsPerClue } = QUIEN_SOY_LEVELS[difficulty];
+  const { secondsPerClue } = QUIEN_SOY_LEVELS[difficulty];
   const atom = shuffle(atoms.filter((candidate) => ejemplos[candidate.id]))[0]!;
   const masked = atom.definicion.replace(
     new RegExp(atom.concepto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
@@ -32,12 +32,11 @@ export function createQuienSoyChallenge(
   const payload: QuienSoyPayload = {
     clues,
     secondsPerClue,
-    mode,
-    options: mode === "options" ? shuffle([correct, ...others]) : [],
+    options: shuffle([correct, ...others]),
   };
   const solution: QuienSoySolution = {
     answer: atom.concepto,
-    optionId: mode === "options" ? correct.id : null,
+    optionId: correct.id,
     explanation: atom.definicion,
   };
 
