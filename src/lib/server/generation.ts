@@ -419,7 +419,9 @@ export async function generateWeek(courseId: string, weekNumber: number) {
       .update({
         generation_status: "failed",
         generation_error:
-          error instanceof HttpError ? error.message : "No se pudieron generar los juegos de esta semana.",
+          error instanceof HttpError
+            ? error.message
+            : "No se pudieron generar los juegos. El material no pasó las validaciones o no fue suficiente.",
       })
       .eq("course_id", courseId)
       .eq("week_number", weekNumber);

@@ -20,6 +20,7 @@ export async function createTestDatabase() {
     "202610300009_remove_free_text.sql",
     "202610300010_reset_student_progress.sql",
     "202610300011_real_weekly_total.sql",
+    "202610310001_soft_delete_courses.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }
@@ -68,6 +69,11 @@ export function createTestClient(db: PGlite) {
     in(column: string, values: unknown[]) {
       this.parameters.push(values);
       this.filters.push(`${column} = any($${this.parameters.length})`);
+      return this;
+    }
+    is(column: string, value: null) {
+      if (value !== null) throw new Error("The test double only supports is(..., null).");
+      this.filters.push(`${column} is null`);
       return this;
     }
     order(column: string, options?: { ascending: boolean }) {

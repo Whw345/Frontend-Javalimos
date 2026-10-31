@@ -4,7 +4,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { createTestClient, createTestDatabase } from "@/test/database";
 import { POST as upload, PATCH as editMaterial } from "@/app/api/courses/[courseId]/materials/route";
 import { GET as listCourses, POST as createCourse } from "@/app/api/courses/route";
-import { GET as getPath } from "@/app/api/courses/[courseId]/route";
+import { DELETE as archive, GET as getPath } from "@/app/api/courses/[courseId]/route";
 import { POST as finish } from "@/app/api/courses/[courseId]/finish/route";
 import { GET as getGame, PATCH as editGame } from "@/app/api/courses/[courseId]/games/[gameId]/route";
 import { GET as getLeaderboard } from "@/app/api/courses/[courseId]/leaderboard/route";
@@ -381,7 +381,8 @@ it("takes a teacher from a new course to a finished path", async () => {
   const failedPath = await (await getPath(new Request("http://localhost"), context)).json();
   expect(failedPath.weeks[1]).toMatchObject({
     generationStatus: "failed",
-    generationError: "No se pudieron generar los juegos de esta semana.",
+    generationError:
+      "No se pudieron generar los juegos. El material no pasó las validaciones o no fue suficiente.",
     games: [],
   });
   expect((await generate(request("generation", "POST", { weekNumber: 2 }), context)).status).toBe(200);
@@ -670,6 +671,39 @@ it("lets only listed teachers create courses, whatever the browser sends", async
   await db.exec("set role authenticated");
   await expect(db.query("select user_id from teachers")).rejects.toThrow("permission denied");
   await db.exec("reset role");
+});
+
+it("archives a course without deleting it from the teacher or student listing", async () => {
+  const archivedId = "66666666-6666-4666-8666-666666666666";
+  await db.exec(`insert into courses(id,name) values ('${archivedId}','Archivado')`);
+  await db.query(
+    `insert into course_members(course_id,user_id,role) values ($1,$2,'teacher'),($1,$3,'student')`,
+    [archivedId, teacher, student],
+  );
+
+  state.userId = teacher;
+  const result = await archive(request(`courses/${archivedId}`, "DELETE", {}), {
+    params: Promise.resolve({ courseId: archivedId }),
+  });
+  expect(result.status).toBe(200);
+  expect((await result.json()).archived).toBe(true);
+
+  const stored = await db.query<{ archived_at: string | null; archived_by: string | null }>(
+    "select archived_at, archived_by from courses where id = $1",
+    [archivedId],
+  );
+  expect(stored.rows[0]?.archived_at).not.toBeNull();
+  expect(stored.rows[0]?.archived_by).toBe(teacher);
+
+  state.userId = teacher;
+  expect((await (await listCourses()).json()).courses).not.toContainEqual(
+    expect.objectContaining({ id: archivedId }),
+  );
+  state.userId = student;
+  expect((await (await listCourses()).json()).courses).not.toContainEqual(
+    expect.objectContaining({ id: archivedId }),
+  );
+  state.userId = teacher;
 });
 
 it("scores the fraction solved, caps it with a hint and accepts what arrives right at the deadline", async () => {

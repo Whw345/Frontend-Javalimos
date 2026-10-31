@@ -1,10 +1,17 @@
 import { cn } from "@/lib/utils/cn";
 
-export type CuyExpresion = "espera" | "feliz" | "animo";
+export type CuyExpresion =
+  | "espera"
+  | "feliz"
+  | "animo"
+  | "invitando"
+  | "pensando"
+  | "celebrando"
+  | "animando";
 
 interface CuyFrontalProps {
   expresion: CuyExpresion;
-  size?: number;
+  size?: number | "sm" | "md" | "lg";
   className?: string;
 }
 
@@ -14,15 +21,17 @@ interface CuyFrontalProps {
  * Solo cambian ojos y boca. Es decorativo: el mensaje siempre va en el texto que lo acompaña.
  */
 export function CuyFrontal({ expresion, size = 96, className }: CuyFrontalProps) {
-  const happy = expresion === "feliz";
+  const numericSize = typeof size === "number" ? size : size === "sm" ? 64 : size === "lg" ? 128 : 96;
+  const happy = expresion === "feliz" || expresion === "celebrando";
+  const waiting = expresion === "espera" || expresion === "pensando";
   return (
     <svg
       aria-hidden
-      width={size}
-      height={size}
+      width={numericSize}
+      height={numericSize}
       viewBox="0 0 120 120"
       fill="none"
-      className={cn("shrink-0", expresion === "espera" && "motion-safe:animate-bounce", className)}
+      className={cn("shrink-0", waiting && "motion-safe:animate-bounce", className)}
     >
       <ellipse
         cx="18"
@@ -68,7 +77,7 @@ export function CuyFrontal({ expresion, size = 96, className }: CuyFrontalProps)
       <ellipse cx="60" cy="76" rx="13" ry="7" fill="var(--color-brand-chocolate)" />
       <path d="M60 83v6" stroke="var(--color-brand-ink)" strokeWidth="2.5" strokeLinecap="round" />
       <path
-        d={happy ? "M46 89c4 8 24 8 28 0" : expresion === "animo" ? "M50 91c3 4 17 4 20 0" : "M52 91h16"}
+        d={happy ? "M46 89c4 8 24 8 28 0" : expresion === "animo" || expresion === "animando" ? "M50 91c3 4 17 4 20 0" : "M52 91h16"}
         stroke="var(--color-brand-ink)"
         strokeWidth="2.5"
         strokeLinecap="round"

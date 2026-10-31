@@ -1,7 +1,8 @@
 import { delay, http, HttpResponse } from "msw";
 import { difficultySchema, gameSlugSchema, type ApiErrorBody, type ChallengeResult } from "@/lib/api/schemas";
 import { API_BASE_URL, POINTS_CORRECT, POINTS_CORRECT_WITH_HINT } from "@/lib/config";
-import { createSession, getProgress, getSession, hasGenerator } from "./db";
+import { CURRENT_WEEK, createSession, getProgress, getSession, hasGenerator } from "./db";
+import { debateHandlers } from "./debateHandlers";
 
 /** Margen de red que el backend acepta después del deadline (§17). */
 const NETWORK_GRACE_MS = 1500;
@@ -15,6 +16,46 @@ function apiError(status: number, code: string, message: string) {
 }
 
 export const handlers = [
+  http.get(api("/courses/:courseId/challenges"), async ({ params }) => {
+    await delay(LATENCY_MS);
+    return HttpResponse.json({
+      course: { name: "Biología 101", current_week: CURRENT_WEEK },
+      weeks: [
+        {
+          weekNumber: CURRENT_WEEK,
+          state: "current",
+          topic: "Ciclo celular y división celular",
+          opensAt: null,
+          deadline: null,
+          hiddenGames: 0,
+          games: [
+            {
+              id: `${String(params.courseId)}-parejas`,
+              game: "parejas",
+              difficulty: 1,
+              status: "available",
+              points: null,
+            },
+            {
+              id: `${String(params.courseId)}-ordena`,
+              game: "ordena",
+              difficulty: 1,
+              status: "available",
+              points: null,
+            },
+            {
+              id: `${String(params.courseId)}-hueco`,
+              game: "hueco",
+              difficulty: 1,
+              status: "available",
+              points: null,
+            },
+          ],
+        },
+      ],
+    });
+  }),
+
   http.get(api("/courses/:courseId/progress"), async ({ params }) => {
     await delay(LATENCY_MS);
     return HttpResponse.json(getProgress(String(params.courseId)));
@@ -80,4 +121,5 @@ export const handlers = [
     };
     return HttpResponse.json(result);
   }),
+  ...debateHandlers,
 ];

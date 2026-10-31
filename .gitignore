@@ -26,9 +26,11 @@ next-env.d.ts
 npm-debug.log*
 pnpm-debug.log*
 
-# env files (se versiona solo .env.example)
+# env files (solo se versiona el ejemplo sin secretos)
 .env*
 !.env.example
+.env.local
+.env.*.local
 
 # Claude Code
 .claude/

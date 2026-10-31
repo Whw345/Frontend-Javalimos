@@ -138,7 +138,15 @@ export function GameShell({ definition, payload }: GameShellProps) {
     { enabled: !exitOpen },
   );
 
-  useVisibilityGuard({ enabled: isPlaying });
+  const handleVisibilityLeave = useCallback(() => {
+    if (!isPlaying) return;
+    // En juegos por rondas, la ronda actual queda sin respuesta y continúa.
+    // En los demás, se envía null para que el servidor la marque incorrecta.
+    if (timing) actions.completeRound();
+    else submit();
+  }, [actions, isPlaying, submit, timing]);
+
+  useVisibilityGuard({ enabled: isPlaying, onLeave: handleVisibilityLeave });
 
   const solution = result ? definition.solutionSchema.safeParse(result.correctAnswer) : null;
   const ResultDetail = definition.ResultDetail;
