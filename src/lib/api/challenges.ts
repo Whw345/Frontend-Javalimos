@@ -4,6 +4,7 @@ import {
   challengeSessionSchema,
   hintResponseSchema,
   progressTotalsSchema,
+  weekChallengesSchema,
   type ChallengeSession,
   type CreateChallengeBody,
   type SubmitAnswerBody,
@@ -21,6 +22,10 @@ function withClockOffset(session: ChallengeSession): ClientChallengeSession {
 
 export function getCourseProgress(courseId: string) {
   return apiRequest(`/api/courses/${courseId}/progress`, progressTotalsSchema);
+}
+
+export function getWeekChallenges(courseId: string) {
+  return apiRequest(`/api/courses/${courseId}/challenges`, weekChallengesSchema);
 }
 
 export async function createChallenge(courseId: string, body: CreateChallengeBody) {

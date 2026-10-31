@@ -163,6 +163,50 @@ export async function getProgress(courseId: string, userId: string) {
   return checked(await getDatabase().rpc("course_progress", { p_course: courseId, p_user: userId }));
 }
 
+/** Retos abiertos de la semana en curso. Nunca incluye solución, pista ni cita. */
+export async function getWeekChallenges(courseId: string, userId: string) {
+  const db = getDatabase();
+  const course = checked(await db.from("courses").select("name").eq("id", courseId).single());
+  const currentWeek = checked(await db.rpc("course_active_week", { p_course: courseId })) as number;
+  const challenges = checked(
+    await db
+      .from("generated_challenges")
+      .select("id, game, difficulty, opens_at, deadline")
+      .eq("course_id", courseId)
+      .eq("week_number", currentWeek)
+      .eq("status", "published")
+      .order("position"),
+  );
+  const sessions = checked(
+    await db
+      .from("challenge_sessions")
+      .select("challenge_id, points")
+      .eq("course_id", courseId)
+      .eq("user_id", userId)
+      .eq("week_number", currentWeek),
+  );
+  const now = Date.now();
+  return {
+    course: { ...course, current_week: currentWeek },
+    challenges: challenges
+      .filter(
+        ({ opens_at, deadline }) =>
+          (!opens_at || Date.parse(opens_at) <= now) && (!deadline || Date.parse(deadline) > now),
+      )
+      .map(({ id, game, difficulty, deadline }) => {
+        const session = sessions.find((item) => item.challenge_id === id);
+        return {
+          id,
+          game,
+          difficulty,
+          deadline: deadline && new Date(deadline).toISOString(),
+          played: Boolean(session),
+          points: session ? (session.points as number) : null,
+        };
+      }),
+  };
+}
+
 export async function startChallenge(courseId: string, userId: string, body: unknown) {
   const input = z
     .object({

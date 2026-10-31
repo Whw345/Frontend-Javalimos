@@ -27,7 +27,7 @@ GOOGLE_CLIENT_SECRET=SECRETO_DE_GOOGLE
 
 No uses `NEXT_PUBLIC_` para las claves. `DECISION_LLM_*` sigue disponible para el adaptador HTTP de decisión del equipo; sin esa URL se utiliza LangChain con AI Gateway para decidir. El relleno de juegos utiliza AI Gateway.
 
-En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql`, `202610300005_teachers.sql` y `202610300006_course_admin.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
+En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql`, `202610300005_teachers.sql`, `202610300006_course_admin.sql` y `202610300007_first_week_open.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
 
 ```powershell
 pnpm dev
@@ -52,20 +52,15 @@ select id from public."user" where lower(email) = 'CORREO-DEL-DOCENTE';
 4. `/docente/ID-DEL-CURSO/camino` genera una semana a la vez, para respetar el límite de llamadas por minuto de AI Gateway, y resume donde quedó si recargas:
    - Con el Markdown de la semana en el System Prompt, el modelo de decisión responde en una sola llamada un booleano por cada uno de los 10 juegos: recibe un mapa `questions` con su `id` y descripción y devuelve `answers` bajo los mismos ids (`src/lib/decision/gameDecision.ts`).
    - Los juegos marcados se envían en una sola llamada como `{ id, args: [...] }` (`src/lib/games/catalog.ts`) para que el LLM complete sus parámetros. Cada juego se valida con Zod, con sus citas del documento (se comparan solo letras y números, y al menos el 75 % del texto citado debe estar en el PDF), con la consistencia de sus opciones y con que el enunciado no revele la respuesta; los rechazados se reintentan una vez sin descartar los válidos.
-   - Se guardan asociados al curso. La fecha 0 es el siguiente lunes en hora de Lima, u hoy si es lunes; cada semana abre el lunes a las 00:00 y vence al iniciar la siguiente.
+   - Se guardan asociados al curso. La fecha 0 es el siguiente lunes en hora de Lima, u hoy si es lunes; cada semana abre el lunes a las 00:00 y vence al iniciar la siguiente. La semana 1 es la excepción: abre al publicar el curso, porque ya es la semana activa antes del primer lunes. La semana 1 es la excepción: abre al publicar el curso, porque ya es la semana activa antes del primer lunes.
 5. El camino muestra todos los juegos. Al tocar uno se edita su contenido; el servidor reconstruye payload, solución y pista.
 6. «Terminar» publica los juegos y abre la administración del curso (`/docente/ID-DEL-CURSO`), por ahora vacía.
 
 ## Recorrido del estudiante
 
-Las membresías de estudiante se administran en el servidor/SQL, nunca mediante datos de rol enviados por el navegador:
+El docente asigna alumnos por correo en la pestaña de alumnos del curso; quien aún no tiene cuenta entra al curso al registrarse. El rol nunca lo decide el navegador.
 
-```sql
-insert into public.course_members(course_id, user_id, role, section) values
-('ID-DEL-CURSO', 'ID-DEL-ESTUDIANTE', 'student', 'A');
-```
-
-El curso aparece en `/cursos` con la etiqueta «Estudiante» y lleva a `/cursos/ID-DEL-CURSO/practicar`. Solo se juegan los retos de la semana en curso, dentro de su ventana. La sesión recibe opciones sin solución ni cita que revele la respuesta. Acierto: 10 puntos; con pista: 5; error o tiempo agotado: 0. Cada reto tiene un solo intento y hay un máximo de 10 por semana. El tiempo, el cupo y los puntos se controlan en servidor y mediante transacciones SQL. «Explícalo en una frase» se evalúa con el LLM después del intento.
+El curso aparece en `/cursos` con la etiqueta «Estudiante» y lleva a `/cursos/ID-DEL-CURSO/practicar`, que muestra los retos de la semana en curso, lo que ya jugó y su cupo. Solo se juegan los retos de esa semana, dentro de su ventana. La sesión recibe opciones sin solución ni cita que revele la respuesta. Acierto: 10 puntos; con pista: 5; error o tiempo agotado: 0. Cada reto tiene un solo intento y hay un máximo de 10 por semana. El tiempo, el cupo y los puntos se controlan en servidor y mediante transacciones SQL. «Explícalo en una frase» se evalúa con el LLM después del intento.
 
 El flujo anterior con sílabo sigue disponible en `/docente/ID-DEL-CURSO/material`.
 
@@ -136,7 +131,7 @@ No se rediseñó la mecánica de los juegos existentes; `src/styles/tokens.css` 
 - Componentes nuevos: `src/components/teacher/*`, `src/components/brand/{Logo,CuyFrontal}.tsx`, `src/components/materials/{TeacherWorkspace,PublishedChallenges}.tsx` y `Workspace.module.css`.
 - APIs nuevas: `src/app/api/auth/[...all]/route.ts`; `src/app/api/courses/[courseId]/{materials,generation,challenges,progress}/route.ts`; `src/app/api/challenges/[sessionId]/route.ts` y sus rutas `hint/route.ts` y `answer/route.ts`.
 - Integración existente adaptada: `src/lib/decision/provider.ts`, `src/app/api/decision/route.ts`, `src/lib/api/schemas.ts`, `src/lib/config.ts`, `src/app/page.tsx`, `src/components/game/GameShell.tsx` y `ResultScreen.tsx`. En los dos últimos solo se ajustó el destino de retorno al listado real; no se modificaron sus estilos.
-- Base de datos: `supabase/migrations/202610300001_learning_pipeline.sql` a `202610300006_course_admin.sql`.
+- Base de datos: `supabase/migrations/202610300001_learning_pipeline.sql` a `202610300007_first_week_open.sql`.
 - Pruebas: `src/lib/server/{pipeline,routes,model}.test.ts`, `src/test/{database,server-only}.ts`, `e2e/integration.spec.ts`, `playwright.config.ts` y `vitest.config.mts`.
 - PDFs ficticios: `fixtures/{silabo,teoria,vacio}.pdf`; generador `scripts/create-pdf-fixtures.mjs`.
 - Configuración y ejecución: `package.json`, `pnpm-lock.yaml`, `.env.example`, `.gitignore`, `next.config.ts`, `tsconfig.json`, `Dockerfile` y `.dockerignore`.

@@ -14,7 +14,7 @@ import {
   POST as assign,
 } from "@/app/api/courses/[courseId]/students/route";
 import { POST as generate, PATCH as publish } from "@/app/api/courses/[courseId]/generation/route";
-import { POST as start } from "@/app/api/courses/[courseId]/challenges/route";
+import { GET as weekChallenges, POST as start } from "@/app/api/courses/[courseId]/challenges/route";
 import { GET as getSession } from "@/app/api/challenges/[sessionId]/route";
 import { firstMonday, weekWindow } from "@/lib/utils/schedule";
 import { POST as answer } from "@/app/api/challenges/[sessionId]/answer/route";
@@ -333,12 +333,12 @@ it("takes a teacher from a new course to a finished path", async () => {
     generationError: "La generación se interrumpió. Inténtalo de nuevo.",
   });
   expect((await generate(request("generation", "POST", { weekNumber: 1 }), context)).status).toBe(200);
-  const stored = await db.query<{ deadline: Date; opens_at: Date; difficulty: number; id: string }>(
+  const stored = await db.query<{ deadline: Date; opens_at: Date | null; difficulty: number; id: string }>(
     "select id, deadline, opens_at, difficulty from generated_challenges where course_id = $1",
     [id],
   );
   expect(stored.rows).toHaveLength(1);
-  expect(stored.rows[0]!.opens_at.toISOString()).toBe(new Date(weekWindow(monday, 1).opensAt).toISOString());
+  expect(stored.rows[0]!.opens_at).toBeNull();
   expect(stored.rows[0]!.deadline.toISOString()).toBe(new Date(weekWindow(monday, 1).deadline).toISOString());
 
   const gameId = stored.rows[0]!.id;
@@ -499,6 +499,76 @@ it("assigns students by email, with or without an account, and ranks them by poi
   await expect(db.query("select email from course_invites")).rejects.toThrow("permission denied");
   await expect(db.query(`select course_roster('${id}')`)).rejects.toThrow("permission denied");
   await db.exec("reset role");
+}, 30_000);
+
+it("lets an assigned student play only the current week, from before the first Monday on", async () => {
+  const id = "abababab-abab-4bab-8bab-abababababab";
+  const documentId = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+  const week1 = "99999999-9999-4999-8999-999999999991";
+  const week2 = "99999999-9999-4999-8999-999999999992";
+  const draft = "99999999-9999-4999-8999-999999999993";
+  const context = { params: Promise.resolve({ courseId: id }) };
+  const list = () => weekChallenges(new Request("http://localhost"), context);
+  const open = (challengeId: string) =>
+    start(request("challenges", "POST", { game: "hueco", difficulty: 1, challengeId }), context);
+
+  await db.exec(`
+    insert into courses(id,name,starts_on) values ('${id}','Semanal',current_date + 3);
+    insert into course_weeks(course_id,week_number,topic,confirmed) values ('${id}',1,'Uno',true),('${id}',2,'Dos',true);
+  `);
+  await db.query(
+    `insert into course_documents(id,course_id,uploaded_by,kind,filename) values ('${documentId}','${id}',$1,'theory','tema.pdf')`,
+    [teacher],
+  );
+  const insertGame = (gameId: string, week: number, status: string, opens: string, deadline: string) =>
+    db.query(
+      `insert into generated_challenges(id,course_id,week_number,game,difficulty,payload,solution,hint,explanation,source,source_document_id,evidence,decision,status,opens_at,deadline)
+      values ($1,'${id}',$2,'hueco',1,'{}','{"optionId":"a","explanation":"Por esto."}','{}','Por esto.','{"documento":"tema.pdf"}','${documentId}','cita','{}',$3,${opens},${deadline})`,
+      [gameId, week, status],
+    );
+  await insertGame(week1, 1, "published", "null", "now() + interval '10 days'");
+  await insertGame(draft, 1, "draft", "null", "now() + interval '10 days'");
+  await insertGame(week2, 2, "published", "now() + interval '10 days'", "now() + interval '17 days'");
+
+  state.userId = student;
+  expect((await list()).status).toBe(403);
+  expect((await open(week1)).status).toBe(403);
+  await db.query("select assign_course_students($1,$2)", [id, [student]]);
+
+  const before = await (await list()).json();
+  expect(before.course).toEqual({ name: "Semanal", current_week: 1 });
+  expect(before.challenges).toMatchObject([{ id: week1, played: false, points: null }]);
+  expect(JSON.stringify(before)).not.toContain("optionId");
+  const listed = await (await listCourses()).json();
+  expect(listed.courses.find((item: { id: string }) => item.id === id)).toMatchObject({
+    role: "student",
+    games: 2,
+  });
+
+  expect((await open(week2)).status).toBe(422);
+  const started = await open(week1);
+  expect(started.status).toBe(200);
+  const session = await started.json();
+  expect(session.week).toBe(1);
+  const answered = await answer(
+    request("answer", "POST", { answer: { optionId: "a" } }),
+    sessionContext(session.sessionId),
+  );
+  expect(await answered.json()).toMatchObject({ correct: true, pointsAwarded: 10 });
+  expect((await (await list()).json()).challenges).toMatchObject([{ id: week1, played: true, points: 10 }]);
+  expect((await open(week1)).status).toBe(422);
+
+  await db.exec(`
+    update courses set starts_on = current_date - 7 where id = '${id}';
+    update generated_challenges set opens_at = now() - interval '1 day' where id = '${week2}';
+    update generated_challenges set deadline = now() - interval '1 day' where id = '${week1}';
+  `);
+  const next = await (await list()).json();
+  expect(next.course.current_week).toBe(2);
+  expect(next.challenges).toMatchObject([{ id: week2, played: false }]);
+
+  state.userId = outsider;
+  expect((await list()).status).toBe(403);
 }, 30_000);
 
 it("rejects courses without a usable name and anonymous listings", async () => {
