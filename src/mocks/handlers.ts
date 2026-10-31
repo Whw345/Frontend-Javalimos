@@ -2,6 +2,7 @@ import { delay, http, HttpResponse } from "msw";
 import { difficultySchema, gameSlugSchema, type ApiErrorBody, type ChallengeResult } from "@/lib/api/schemas";
 import { API_BASE_URL, POINTS_CORRECT, POINTS_CORRECT_WITH_HINT } from "@/lib/config";
 import { createSession, getProgress, getSession, hasGenerator } from "./db";
+import { debateHandlers } from "./debateHandlers";
 
 /** Margen de red que el backend acepta después del deadline (§17). */
 const NETWORK_GRACE_MS = 1500;
@@ -81,4 +82,6 @@ export const handlers = [
     };
     return HttpResponse.json(result);
   }),
+
+  ...debateHandlers,
 ];

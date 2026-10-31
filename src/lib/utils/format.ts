@@ -15,6 +15,22 @@ export function formatClock(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+const dateFormatter = new Intl.DateTimeFormat("es-PE", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  timeZone: "America/Lima",
+});
+
+/** ISO → "lun 3 nov" (§15: fechas con formato local, en hora de Lima). */
+export function formatDate(iso: string): string {
+  return dateFormatter
+    .formatToParts(new Date(iso))
+    .filter((part) => part.type !== "literal")
+    .map((part) => part.value.replace(".", ""))
+    .join(" ");
+}
+
 /** 12 300 ms → "12 s". */
 export function formatDuration(ms: number): string {
   return `${Math.max(0, Math.round(ms / 1000))} s`;

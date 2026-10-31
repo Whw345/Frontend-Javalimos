@@ -12,6 +12,10 @@ interface ConfirmDialogProps {
   cancelLabel: string;
   confirmVariant?: ButtonProps["variant"];
   onConfirm: () => void;
+  /** Segunda acción opcional (p. ej. "Salir sin evaluación" junto a "Terminar y ver evaluación"). */
+  secondaryLabel?: string;
+  secondaryVariant?: ButtonProps["variant"];
+  onSecondary?: () => void;
 }
 
 /** Diálogo de confirmación accesible (Radix AlertDialog), p. ej. "¿Salir del reto?". */
@@ -24,6 +28,9 @@ export function ConfirmDialog({
   cancelLabel,
   confirmVariant = "danger",
   onConfirm,
+  secondaryLabel,
+  secondaryVariant = "danger",
+  onSecondary,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -34,10 +41,17 @@ export function ConfirmDialog({
           <AlertDialog.Description className="mt-2 type-body text-text-secondary">
             {description}
           </AlertDialog.Description>
-          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
             <AlertDialog.Cancel asChild>
               <Button variant="secondary">{cancelLabel}</Button>
             </AlertDialog.Cancel>
+            {secondaryLabel && onSecondary && (
+              <AlertDialog.Action asChild>
+                <Button variant={secondaryVariant} onClick={onSecondary}>
+                  {secondaryLabel}
+                </Button>
+              </AlertDialog.Action>
+            )}
             <AlertDialog.Action asChild>
               <Button variant={confirmVariant} onClick={onConfirm}>
                 {confirmLabel}

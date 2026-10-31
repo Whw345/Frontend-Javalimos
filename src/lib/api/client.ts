@@ -21,10 +21,12 @@ export function errorMessage(error: unknown): string {
 }
 
 export async function apiRequest<T>(path: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
+  // Con FormData (p. ej. el audio opcional del Debate) el navegador pone el Content-Type con su boundary.
+  const isForm = init?.body instanceof FormData;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: isForm ? init?.headers : { "Content-Type": "application/json", ...init?.headers },
   });
   const body: unknown = await response.json().catch(() => null);
 

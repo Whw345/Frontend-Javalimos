@@ -43,7 +43,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
   const playHref = `/cursos/${session.courseId}/${API_MOCKING_ENABLED ? "jugar" : "practicar"}`;
 
   return (
-    <div className="min-h-dvh bg-(image:--gradient-night) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
+    <div className="min-h-dvh bg-(image:--gradient-surface) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
       <main className="mx-auto grid w-full max-w-160 gap-6 lg:max-w-240 lg:grid-cols-2 lg:items-center lg:gap-12">
         <section className="flex flex-col items-center gap-4 text-center lg:items-start lg:text-left">
           {definition && (

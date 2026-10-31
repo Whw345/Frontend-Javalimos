@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { copy } from "@/content/copy";
+import { DebatePremiumCard } from "@/features/debate/DebatePremiumCard";
 import { availableGames, type AnyGameDefinition } from "@/games/registry";
 import type { Difficulty } from "@/games/types";
 import { errorMessage } from "@/lib/api/client";
@@ -27,7 +28,7 @@ export function GamePicker({ courseId }: { courseId: string }) {
   const limitReached = progress.data ? progress.data.weeklyPlayed >= progress.data.weeklyLimit : false;
 
   return (
-    <div className="min-h-dvh bg-(image:--gradient-night) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
+    <div className="min-h-dvh bg-(image:--gradient-surface) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
       <main className="mx-auto flex w-full max-w-300 flex-col gap-8 lg:gap-12">
         <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-col gap-2">
@@ -49,6 +50,8 @@ export function GamePicker({ courseId }: { courseId: string }) {
             )}
           </Card>
         </header>
+
+        <DebatePremiumCard courseId={courseId} />
 
         <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
           {availableGames.map((definition, index) => (

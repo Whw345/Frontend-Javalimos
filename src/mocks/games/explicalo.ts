@@ -6,45 +6,14 @@ import {
 } from "@/games/explicalo/schema";
 import type { Atom, Difficulty } from "@/games/types";
 import { shuffle } from "../random";
+import { keywordsOf, mentions, normalize, type Idea } from "../text";
 import type { MockChallenge } from "../types";
 
-const STOPWORDS = new Set([
-  "para",
-  "sobre",
-  "entre",
-  "desde",
-  "hasta",
-  "cada",
-  "como",
-  "durante",
-  "final",
-  "también",
-]);
 const MIN_RATIO = 0.5;
-
-// Quita tildes (y la de la ñ): se aplica igual a la respuesta y a la referencia.
-const normalize = (text: string) =>
-  text
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-
-interface Idea {
-  /** Forma normalizada, para comparar. */
-  key: string;
-  /** Palabra tal como aparece en el material, para mostrar. */
-  label: string;
-}
 
 /** Ideas clave = palabras con contenido de la definición (sin el propio concepto). */
 function keywords(atom: Atom): Idea[] {
-  const concept = new Set(normalize(atom.concepto).split(/\s+/));
-  const ideas = new Map<string, Idea>();
-  for (const word of atom.definicion.toLowerCase().match(/\p{L}{5,}/gu) ?? []) {
-    const key = normalize(word);
-    if (!STOPWORDS.has(key) && !concept.has(key) && !ideas.has(key)) ideas.set(key, { key, label: word });
-  }
-  return [...ideas.values()];
+  return keywordsOf(atom.definicion, atom.concepto);
 }
 
 /**
@@ -73,10 +42,7 @@ export function createExplicaloChallenge(atoms: Atom[], difficulty: Difficulty):
     grade: (answer) => {
       const parsed = explicaloAnswerSchema.safeParse(answer);
       const text = normalize(parsed.success ? parsed.data.text : "");
-      // Raíz de la palabra: acepta plurales y variaciones cortas ("célula" / "células").
-      const matched = ideas.filter((idea) =>
-        text.includes(idea.key.slice(0, Math.max(5, idea.key.length - 2))),
-      );
+      const matched = ideas.filter((idea) => mentions(text, idea.key));
       const missing = ideas.filter((idea) => !matched.includes(idea));
       lastSolution = { reference: atom.definicion, matched: labels(matched), missing: labels(missing) };
       const correct =

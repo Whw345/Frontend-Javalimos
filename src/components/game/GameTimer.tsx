@@ -14,24 +14,15 @@ function stageFor(ratio: number): TimerStage {
   return "critical";
 }
 
-const fillClasses: Record<TimerStage, string> = {
-  normal: "bg-primary",
-  warning: "bg-warning",
-  critical: "bg-error",
-};
-
-const textClasses: Record<TimerStage, string> = {
-  normal: "text-text-secondary",
-  warning: "text-warning",
-  critical: "text-error motion-safe:animate-timer-pulse",
-};
-
 interface GameTimerProps {
   remainingMs: number;
   totalMs: number;
 }
 
-/** Barra de ancho completo + número; cambia de color por umbral (§11.2). */
+/**
+ * Barra de ancho completo + número (§11.2). El color es fijo (`timer`) para reconocerlo
+ * de un vistazo; la urgencia final se comunica con barra más gruesa, pulso y anuncio.
+ */
 export function GameTimer({ remainingMs, totalMs }: GameTimerProps) {
   const ratio = totalMs > 0 ? Math.min(1, remainingMs / totalMs) : 0;
   const stage = stageFor(ratio);
@@ -52,18 +43,21 @@ export function GameTimer({ remainingMs, totalMs }: GameTimerProps) {
         aria-valuemin={0}
         aria-valuemax={Math.round(totalMs / 1000)}
         aria-valuenow={Math.ceil(remainingMs / 1000)}
-        className="h-2 flex-1 overflow-hidden rounded-full bg-surface-sunken"
+        className={cn(
+          "flex-1 overflow-hidden rounded-full bg-surface-sunken transition-[height] duration-(--duration-fast)",
+          stage === "critical" ? "h-3" : "h-2.5",
+        )}
       >
         <div
-          className={cn(
-            "h-full w-full origin-left rounded-full transition-[background-color] duration-(--duration-fast) motion-safe:transition-[transform,background-color] motion-safe:duration-(--duration-instant) motion-safe:ease-linear",
-            fillClasses[stage],
-          )}
+          className="h-full w-full origin-left rounded-full bg-timer motion-safe:transition-transform motion-safe:duration-(--duration-instant) motion-safe:ease-linear"
           style={{ transform: `scaleX(${ratio})` }}
         />
       </div>
       <span
-        className={cn("flex w-16 items-center justify-end gap-1 type-label tabular-nums", textClasses[stage])}
+        className={cn(
+          "flex w-16 items-center justify-end gap-1 type-label text-timer tabular-nums",
+          stage === "critical" && "motion-safe:animate-timer-pulse",
+        )}
       >
         <Timer aria-hidden className="size-4" />
         {formatClock(remainingMs)}

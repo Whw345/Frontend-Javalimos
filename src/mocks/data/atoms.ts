@@ -109,3 +109,79 @@ export const biologyWeek5Atoms: Atom[] = [
     dificultad: 3,
   },
 ];
+
+const DOC_WEEK3 = "Semana3_LaCelula.pdf";
+const DOC_WEEK4 = "Semana4_CicloCelularYADN.pdf";
+
+/** Temas de semanas anteriores: el Debate los cruza con los de la semana actual. */
+export const biologyEarlierWeeksAtoms: Atom[] = [
+  {
+    id: "atom-nucleo",
+    concepto: "Núcleo celular",
+    definicion: "El núcleo celular guarda el ADN y controla la actividad de la célula eucariota.",
+    confusiones: [
+      "El núcleo celular produce la energía de la célula.",
+      "Las bacterias tienen un núcleo celular rodeado de membrana.",
+    ],
+    relacionados: ["Cromosoma", "Célula eucariota"],
+    fuente: { documento: DOC_WEEK3, pagina: 3, fragmento: "…el núcleo contiene el material genético…" },
+    semana: 3,
+    dificultad: 1,
+  },
+  {
+    id: "atom-mitocondria",
+    concepto: "Mitocondria",
+    definicion:
+      "La mitocondria realiza la respiración celular y produce la energía de la célula en forma de ATP.",
+    confusiones: [
+      "La mitocondria guarda el ADN principal de la célula.",
+      "La mitocondria solo existe en las células vegetales.",
+    ],
+    relacionados: ["Célula eucariota", "Respiración celular"],
+    fuente: { documento: DOC_WEEK3, pagina: 6, fragmento: "…la mitocondria sintetiza ATP…" },
+    semana: 3,
+    dificultad: 2,
+  },
+  {
+    id: "atom-ciclo-celular",
+    concepto: "Ciclo celular",
+    definicion:
+      "El ciclo celular alterna una interfase de crecimiento y duplicación con una fase de división.",
+    confusiones: [
+      "El ciclo celular termina cuando la célula duplica su ADN.",
+      "Todas las células se dividen sin control durante el ciclo celular.",
+    ],
+    relacionados: ["Interfase", "Mitosis", "Punto de control"],
+    fuente: { documento: DOC_WEEK4, pagina: 2, fragmento: "…interfase y fase M…" },
+    semana: 4,
+    dificultad: 1,
+  },
+  {
+    id: "atom-replicacion",
+    concepto: "Replicación del ADN",
+    definicion:
+      "La replicación del ADN es semiconservativa: cada molécula nueva conserva una hebra original.",
+    confusiones: [
+      "La replicación del ADN crea dos moléculas con hebras totalmente nuevas.",
+      "La replicación del ADN ocurre durante la anafase.",
+    ],
+    relacionados: ["Interfase", "Fase S", "Cromosoma"],
+    fuente: { documento: DOC_WEEK4, pagina: 5, fragmento: "…cada hebra sirve de molde…" },
+    semana: 4,
+    dificultad: 2,
+  },
+  {
+    id: "atom-cromosoma",
+    concepto: "Cromosoma",
+    definicion:
+      "Un cromosoma es ADN compactado con proteínas; tras duplicarse tiene dos cromátidas hermanas unidas por el centrómero.",
+    confusiones: [
+      "Un cromosoma es una proteína que produce energía.",
+      "Las cromátidas hermanas provienen de progenitores distintos.",
+    ],
+    relacionados: ["Cromosomas homólogos", "Centrómero", "Replicación del ADN"],
+    fuente: { documento: DOC_WEEK4, pagina: 7, fragmento: "…dos cromátidas unidas por el centrómero…" },
+    semana: 4,
+    dificultad: 2,
+  },
+];
