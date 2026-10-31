@@ -74,6 +74,7 @@ beforeAll(async () => {
   for (const id of [teacher, student, outsider]) {
     await db.query(`insert into "user"(id,name,email,"emailVerified") values ($1,$1,$1,true)`, [id]);
   }
+  await db.query("insert into teachers(user_id) values ($1)", [teacher]);
   await db.exec(
     `insert into courses(id,name) values ('${courseId}','Biologia'),('${otherCourseId}','Otro curso')`,
   );
@@ -261,6 +262,7 @@ it("takes a teacher from a new course to a finished path", async () => {
   const { id } = await created.json();
   const context = { params: Promise.resolve({ courseId: id }) };
   const listed = await (await listCourses()).json();
+  expect(listed.canCreateCourses).toBe(true);
   expect(listed.courses[0]).toMatchObject({ id, role: "teacher", setupCompleted: false, weeks: 0 });
 
   async function uploadToWeek(week: number) {
@@ -402,4 +404,22 @@ it("rejects courses without a usable name and anonymous listings", async () => {
   state.userId = "";
   expect((await listCourses()).status).toBe(401);
   expect((await createCourse(request("courses", "POST", { name: "Sin sesion" }))).status).toBe(401);
+});
+
+it("lets only listed teachers create courses, whatever the browser sends", async () => {
+  state.userId = student;
+  const listed = await (await listCourses()).json();
+  expect(listed.canCreateCourses).toBe(false);
+  const denied = await createCourse(
+    request("courses", "POST", { name: "Curso del alumno", role: "teacher", canCreateCourses: true }),
+  );
+  expect(denied.status).toBe(403);
+  await expect(db.query("select create_course('Directo', $1, '2026-11-02')", [student])).rejects.toThrow(
+    "NOT_A_TEACHER",
+  );
+  const courses = await db.query("select id from courses where name = 'Curso del alumno'");
+  expect(courses.rows).toHaveLength(0);
+  await db.exec("set role authenticated");
+  await expect(db.query("select user_id from teachers")).rejects.toThrow("permission denied");
+  await db.exec("reset role");
 });

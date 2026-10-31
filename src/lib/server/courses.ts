@@ -6,7 +6,7 @@ import type { Difficulty } from "@/games/types";
 import { dateKey, firstMonday, weekWindow } from "@/lib/utils/schedule";
 import { HttpError } from "./errors";
 import { buildChallenge } from "./generation";
-import { checked, getDatabase } from "./supabase";
+import { checked, getDatabase, isTeacher } from "./supabase";
 
 /** Same window after which claim_week_generation lets a week be claimed again. */
 const STALE_GENERATION_MS = 5 * 60 * 1000;
@@ -17,7 +17,8 @@ export async function listCourses(userId: string) {
     await db.from("course_members").select("course_id, role").eq("user_id", userId),
   );
   const ids = memberships.map((membership) => membership.course_id as string);
-  if (!ids.length) return { courses: [] };
+  const canCreateCourses = await isTeacher(userId);
+  if (!ids.length) return { canCreateCourses, courses: [] };
   const courses = checked(
     await db.from("courses").select("id, name, created_at, setup_completed_at").in("id", ids),
   );
@@ -26,6 +27,7 @@ export async function listCourses(userId: string) {
     await db.from("generated_challenges").select("course_id, status").in("course_id", ids),
   );
   return {
+    canCreateCourses,
     courses: courses
       .map((course) => ({
         id: course.id as string,

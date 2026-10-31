@@ -47,7 +47,9 @@ export function CourseList() {
         <TeacherHeader />
         <div>
           <h1 className="type-h1 text-text">{t.title}</h1>
-          <p className="mt-1 type-body text-text-secondary">{t.subtitle}</p>
+          <p className="mt-1 type-body text-text-secondary">
+            {courses.data && !courses.data.canCreateCourses ? t.studentSubtitle : t.subtitle}
+          </p>
         </div>
         {courses.isError && !unauthorized ? (
           <EmptyState
@@ -60,21 +62,23 @@ export function CourseList() {
           />
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <li>
-              <Link
-                href="/docente/nuevo"
-                className={cn(
-                  cardVariants({ interactive: true }),
-                  "flex h-full min-h-44 flex-col items-center justify-center gap-2 border-2 border-dashed border-border-strong bg-transparent text-center focus-visible:shadow-glow-primary",
-                )}
-              >
-                <span className="flex size-12 items-center justify-center rounded-md bg-primary-soft text-primary-text">
-                  <Plus aria-hidden className="size-6" />
-                </span>
-                <span className="type-h3 text-text">{t.create}</span>
-                <span className="type-caption text-text-secondary">{t.createHint}</span>
-              </Link>
-            </li>
+            {courses.data?.canCreateCourses && (
+              <li>
+                <Link
+                  href="/docente/nuevo"
+                  className={cn(
+                    cardVariants({ interactive: true }),
+                    "flex h-full min-h-44 flex-col items-center justify-center gap-2 border-2 border-dashed border-border-strong bg-transparent text-center focus-visible:shadow-glow-primary",
+                  )}
+                >
+                  <span className="flex size-12 items-center justify-center rounded-md bg-primary-soft text-primary-text">
+                    <Plus aria-hidden className="size-6" />
+                  </span>
+                  <span className="type-h3 text-text">{t.create}</span>
+                  <span className="type-caption text-text-secondary">{t.createHint}</span>
+                </Link>
+              </li>
+            )}
             {courses.isPending &&
               [0, 1].map((key) => (
                 <li key={key}>
@@ -110,7 +114,7 @@ export function CourseList() {
         {courses.data?.courses.length === 0 && (
           <div className="flex items-center justify-center gap-3 text-text-secondary">
             <CuyFrontal expresion="animo" size={64} />
-            <p className="type-body">{t.createHint}</p>
+            <p className="type-body">{courses.data.canCreateCourses ? t.createHint : t.noCourses}</p>
           </div>
         )}
       </div>

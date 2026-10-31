@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleCheck, CircleX, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { copy } from "@/content/copy";
-import { createCourse, uploadPdf } from "@/lib/api/teacher";
+import { createCourse, getCourses, uploadPdf } from "@/lib/api/teacher";
 import { MAX_PDF_BYTES, MAX_PDF_MB } from "@/lib/config";
 import { TeacherHeader } from "./TeacherHeader";
 
@@ -40,6 +40,16 @@ function StatusIcon({ item }: { item: UploadItem }) {
 export function CourseUpload({ existingCourseId }: { existingCourseId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const access = useQuery({
+    queryKey: ["teacher", "courses"],
+    queryFn: getCourses,
+    enabled: !existingCourseId,
+    retry: false,
+  });
+  const notAllowed = access.data?.canCreateCourses === false || access.isError;
+  useEffect(() => {
+    if (notAllowed) router.replace("/cursos");
+  }, [notAllowed, router]);
   const input = useRef<HTMLInputElement>(null);
   const [courseId, setCourseId] = useState(existingCourseId);
   const [name, setName] = useState("");

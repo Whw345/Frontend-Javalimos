@@ -1,6 +1,6 @@
 import { checkOrigin, handleApi } from "@/lib/server/errors";
 import { createCourse, listCourses } from "@/lib/server/courses";
-import { requireUser } from "@/lib/server/supabase";
+import { requireTeacher, requireUser } from "@/lib/server/supabase";
 
 export const runtime = "nodejs";
 
@@ -8,10 +8,10 @@ export async function GET() {
   return handleApi(async () => listCourses(await requireUser()));
 }
 
-// Whoever creates a course becomes its teacher: the role never comes from the browser.
+// Sign-up only creates students: teachers come from the teachers table, never from the browser.
 export async function POST(request: Request) {
   return handleApi(async () => {
     checkOrigin(request);
-    return createCourse(await requireUser(), await request.json());
+    return createCourse(await requireTeacher(), await request.json());
   });
 }

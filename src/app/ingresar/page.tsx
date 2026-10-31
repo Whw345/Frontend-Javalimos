@@ -8,7 +8,7 @@ import { copy } from "@/content/copy";
 import { authClient } from "@/lib/auth-client";
 
 const t = copy.auth;
-const AFTER_LOGIN = "/docente";
+const AFTER_LOGIN = "/cursos";
 
 function oauthMessage(error: string | null) {
   if (!error) return "";

@@ -1,5 +1,5 @@
-import { CourseList } from "@/components/teacher/CourseList";
+import { redirect } from "next/navigation";
 
 export default function TeacherCoursesPage() {
-  return <CourseList />;
+  redirect("/cursos");
 }

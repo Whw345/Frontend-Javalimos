@@ -107,7 +107,7 @@ export const copy = {
     signIn: "Ingresar",
     signUp: "Crear cuenta",
     google: "Continuar con Google",
-    toSignUp: "Crear una cuenta",
+    toSignUp: "Crear cuenta de alumno",
     toSignIn: "Ya tengo una cuenta",
     badCredentials: "Correo o contraseña incorrectos.",
     signUpFailed: "No se pudo crear la cuenta.",
@@ -122,6 +122,8 @@ export const copy = {
     courses: {
       title: "Mis cursos",
       subtitle: "Elige un curso o crea uno nuevo.",
+      studentSubtitle: "Aquí aparecen los cursos en los que estás inscrito.",
+      noCourses: "Aún no estás inscrito en ningún curso.",
       create: "Crear curso",
       createHint: "Sube tus PDFs y la IA prepara los retos.",
       inSetup: "En preparación",

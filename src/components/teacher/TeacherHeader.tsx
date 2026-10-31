@@ -17,7 +17,7 @@ export function TeacherHeader() {
   return (
     <header className="flex items-center justify-between gap-4">
       <Link
-        href="/docente"
+        href="/cursos"
         aria-label={copy.teacher.backToCourses}
         className="rounded-md focus-visible:shadow-glow-primary"
       >
