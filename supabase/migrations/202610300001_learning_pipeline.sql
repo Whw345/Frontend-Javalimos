@@ -1,11 +1,11 @@
 -- This repository had no database schema. Run once using the Supabase SQL editor.
 create table public.courses (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   current_week integer not null default 1 check (current_week between 1 and 52)
 );
 create table public.course_members (
-  course_id text references public.courses on delete cascade,
+  course_id uuid references public.courses on delete cascade,
   user_id uuid references auth.users on delete cascade,
   role text not null check (role in ('teacher', 'student')),
   section text not null default 'A',
@@ -13,7 +13,7 @@ create table public.course_members (
 );
 create table public.course_documents (
   id uuid primary key default gen_random_uuid(),
-  course_id text not null references public.courses on delete cascade,
+  course_id uuid not null references public.courses on delete cascade,
   uploaded_by uuid not null references auth.users,
   kind text not null check (kind in ('syllabus', 'theory')),
   filename text not null,
@@ -23,7 +23,7 @@ create table public.course_documents (
   unique (id, course_id)
 );
 create table public.course_weeks (
-  course_id text references public.courses on delete cascade,
+  course_id uuid references public.courses on delete cascade,
   week_number integer check (week_number between 1 and 52),
   topic text not null,
   starts_on date,
@@ -33,7 +33,7 @@ create table public.course_weeks (
   foreign key (syllabus_id, course_id) references public.course_documents(id, course_id)
 );
 create table public.document_weeks (
-  course_id text not null,
+  course_id uuid not null,
   document_id uuid not null,
   week_number integer not null,
   primary key (document_id, week_number),
@@ -42,7 +42,7 @@ create table public.document_weeks (
 );
 create table public.generated_challenges (
   id uuid primary key default gen_random_uuid(),
-  course_id text not null,
+  course_id uuid not null,
   week_number integer not null,
   game text not null check (game in ('hueco', 'parejas', 'ordena')),
   difficulty integer not null check (difficulty between 1 and 3),
@@ -62,7 +62,7 @@ create table public.generated_challenges (
 create table public.challenge_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users,
-  course_id text not null references public.courses,
+  course_id uuid not null references public.courses,
   week_number integer not null,
   challenge_id uuid not null references public.generated_challenges,
   started_at timestamptz not null default now(),
@@ -92,7 +92,7 @@ grant all on public.courses, public.course_members, public.course_documents, pub
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
 values ('course-materials', 'course-materials', false, 10485760, array['application/pdf']);
 
-create function public.course_progress(p_course text, p_user uuid) returns jsonb
+create function public.course_progress(p_course uuid, p_user uuid) returns jsonb
 language sql security invoker set search_path = public as $$
   select jsonb_build_object(
     'points', coalesce(sum(s.points), 0),
@@ -103,12 +103,12 @@ language sql security invoker set search_path = public as $$
   where c.id = p_course group by c.current_week;
 $$;
 
-create function public.confirm_course_weeks(p_course text, p_syllabus uuid, p_weeks jsonb) returns boolean
+create function public.confirm_course_weeks(p_course uuid, p_syllabus uuid, p_weeks jsonb) returns boolean
 language plpgsql security invoker set search_path = public as $$
 declare item jsonb;
 begin
   if not exists(select 1 from course_documents where id = p_syllabus and course_id = p_course and kind = 'syllabus') then raise exception 'INVALID_SYLLABUS'; end if;
-  perform pg_advisory_xact_lock(hashtextextended(p_course, 0));
+  perform pg_advisory_xact_lock(hashtextextended(p_course::text, 0));
   delete from course_weeks where course_id = p_course and week_number not in
     (select (value->>'weekNumber')::integer from jsonb_array_elements(p_weeks));
   for item in select value from jsonb_array_elements(p_weeks) loop
@@ -121,7 +121,7 @@ begin
 end;
 $$;
 
-create function public.assign_document_weeks(p_course text, p_document uuid, p_weeks integer[]) returns boolean
+create function public.assign_document_weeks(p_course uuid, p_document uuid, p_weeks integer[]) returns boolean
 language plpgsql security invoker set search_path = public as $$
 begin
   if not exists(select 1 from course_documents where id = p_document and course_id = p_course and kind = 'theory') then raise exception 'INVALID_DOCUMENT'; end if;
@@ -133,7 +133,7 @@ begin
 end;
 $$;
 
-create function public.start_challenge(p_course text, p_user uuid, p_game text, p_difficulty integer, p_challenge uuid default null)
+create function public.start_challenge(p_course uuid, p_user uuid, p_game text, p_difficulty integer, p_challenge uuid default null)
 returns jsonb language plpgsql security invoker set search_path = public as $$
 declare
   active_week integer;
@@ -145,7 +145,7 @@ begin
     raise exception 'FORBIDDEN';
   end if;
   select current_week into active_week from courses where id = p_course;
-  perform pg_advisory_xact_lock(hashtextextended(p_course || p_user::text || active_week::text, 0));
+  perform pg_advisory_xact_lock(hashtextextended(p_course::text || p_user::text || active_week::text, 0));
   select count(*) into played from challenge_sessions where course_id = p_course and user_id = p_user and week_number = active_week;
   if played >= 10 then raise exception 'WEEKLY_LIMIT_REACHED'; end if;
   select * into selected from generated_challenges g where g.course_id = p_course
@@ -190,9 +190,9 @@ begin
 end;
 $$;
 
-revoke all on function public.course_progress(text, uuid), public.start_challenge(text, uuid, text, integer, uuid),
+revoke all on function public.course_progress(uuid, uuid), public.start_challenge(uuid, uuid, text, integer, uuid),
   public.reveal_session_hint(uuid, uuid), public.finish_challenge(uuid, uuid, boolean, jsonb) from public, anon, authenticated;
-grant execute on function public.course_progress(text, uuid), public.start_challenge(text, uuid, text, integer, uuid),
+grant execute on function public.course_progress(uuid, uuid), public.start_challenge(uuid, uuid, text, integer, uuid),
   public.reveal_session_hint(uuid, uuid), public.finish_challenge(uuid, uuid, boolean, jsonb) to service_role;
-revoke all on function public.confirm_course_weeks(text, uuid, jsonb), public.assign_document_weeks(text, uuid, integer[]) from public, anon, authenticated;
-grant execute on function public.confirm_course_weeks(text, uuid, jsonb), public.assign_document_weeks(text, uuid, integer[]) to service_role;
+revoke all on function public.confirm_course_weeks(uuid, uuid, jsonb), public.assign_document_weeks(uuid, uuid, integer[]) from public, anon, authenticated;
+grant execute on function public.confirm_course_weeks(uuid, uuid, jsonb), public.assign_document_weeks(uuid, uuid, integer[]) to service_role;

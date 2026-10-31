@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Sora } from "next/font/google";
+import { Archivo_Black, Inter, JetBrains_Mono, Sora } from "next/font/google";
 import type { ReactNode } from "react";
 import "@/styles/tokens.css";
 import { Providers } from "./providers";
 
+const archivoBlack = Archivo_Black({ subsets: ["latin"], weight: "400", variable: "--font-archivo-black" });
 const sora = Sora({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-sora" });
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-inter" });
 const jetbrains = JetBrains_Mono({
@@ -18,13 +19,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0b1e",
+  themeColor: "#121212",
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es-PE" className={`${sora.variable} ${inter.variable} ${jetbrains.variable}`}>
+    <html lang="es-PE" className={`${archivoBlack.variable} ${sora.variable} ${inter.variable} ${jetbrains.variable}`}>
       <body>
         <Providers>{children}</Providers>
       </body>

@@ -8,16 +8,24 @@ export async function GET(_request: Request, { params }: Context) {
     const { courseId } = await params;
     await requireCourse(courseId);
     const db = getDatabase();
-    const course = checked(await db.from("courses").select("name, current_week").eq("id", courseId).single());
+    const course = checked(await db.from("courses").select("name").eq("id", courseId).single());
+    const currentWeek = checked(await db.rpc("course_active_week", { p_course: courseId })) as number;
     const challenges = checked(
       await db
         .from("generated_challenges")
-        .select("id, game, difficulty, week_number")
+        .select("id, game, difficulty, week_number, opens_at, deadline")
         .eq("course_id", courseId)
-        .eq("week_number", course.current_week)
+        .eq("week_number", currentWeek)
         .eq("status", "published"),
     );
-    return { course, challenges };
+    const now = Date.now();
+    return {
+      course: { ...course, current_week: currentWeek },
+      challenges: challenges.filter(
+        ({ opens_at, deadline }) =>
+          (!opens_at || Date.parse(opens_at) <= now) && (!deadline || Date.parse(deadline) > now),
+      ),
+    };
   });
 }
 export async function POST(request: Request, { params }: Context) {

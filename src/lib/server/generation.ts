@@ -1,42 +1,43 @@
 import "server-only";
 import { randomInt, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { decideForTopic, type DecisionModel } from "@/lib/decision/decide";
-import { getConfiguredDecisionModel } from "@/lib/decision/provider";
+import { CUAL_MAYOR_LEVELS } from "@/games/cual-mayor/logic";
+import { cualMayorPayloadSchema, cualMayorSolutionSchema } from "@/games/cual-mayor/schema";
+import { DESLIZA_LEVELS } from "@/games/desliza/logic";
+import { deslizaPayloadSchema, deslizaSolutionSchema } from "@/games/desliza/schema";
+import { DOS_CAJAS_LEVELS } from "@/games/dos-cajas/logic";
+import { dosCajasPayloadSchema, dosCajasSolutionSchema } from "@/games/dos-cajas/schema";
+import { ENCUENTRA_ERROR_LEVELS } from "@/games/encuentra-error/logic";
+import { encuentraErrorPayloadSchema, encuentraErrorSolutionSchema } from "@/games/encuentra-error/schema";
+import { EXPLICALO_LEVELS } from "@/games/explicalo/logic";
+import { explicaloPayloadSchema } from "@/games/explicalo/schema";
+import { HUECO_LEVELS } from "@/games/hueco/logic";
 import { huecoPayloadSchema, huecoSolutionSchema } from "@/games/hueco/schema";
-import { parejasPayloadSchema, parejasSolutionSchema } from "@/games/parejas/schema";
+import { INTRUSO_LEVELS } from "@/games/intruso/logic";
+import { intrusoPayloadSchema, intrusoSolutionSchema } from "@/games/intruso/schema";
+import { ORDENA_LEVELS } from "@/games/ordena/logic";
 import { ordenaPayloadSchema, ordenaSolutionSchema } from "@/games/ordena/schema";
+import { PAREJAS_LEVELS } from "@/games/parejas/logic";
+import { parejasPayloadSchema, parejasSolutionSchema } from "@/games/parejas/schema";
+import { QUIEN_SOY_LEVELS } from "@/games/quien-soy/logic";
+import { quienSoyPayloadSchema, quienSoySolutionSchema } from "@/games/quien-soy/schema";
+import type { Difficulty, GameSlug } from "@/games/types";
+import { decideGames, type GameDecision, type GameDecisionModel } from "@/lib/decision/gameDecision";
+import { getConfiguredGameDecisionModel } from "@/lib/decision/provider";
+import { gameCatalog, gameRequest } from "@/lib/games/catalog";
+import { dateKey, difficultyForWeek, weekWindow } from "@/lib/utils/schedule";
+import { HttpError } from "./errors";
 import { getWeekContext } from "./materials";
 import { createGatewayModel, type StructuredModel } from "./model";
 import { checked, getDatabase } from "./supabase";
 
-const text = z.string().trim().min(1).max(240);
-const common = {
-  explanation: z.string().min(10).max(800),
-  sourceId: z.string(),
-  evidence: z.string().min(10).max(1000),
-};
-export const generatedSchema = z.discriminatedUnion("game", [
-  z.object({
-    game: z.literal("hueco"),
-    before: z.string().max(200),
-    after: z.string().max(200),
-    answer: z.string().min(1).max(80),
-    distractors: z.array(z.string().min(1).max(80)).min(2).max(3),
-    ...common,
-  }),
-  z.object({
-    game: z.literal("parejas"),
-    pairs: z
-      .array(z.object({ concept: text, definition: text }))
-      .min(3)
-      .max(5),
-    ...common,
-  }),
-  z.object({ game: z.literal("ordena"), steps: z.array(text).min(4).max(6), ...common }),
-]);
-export type Generated = z.infer<typeof generatedSchema>;
-const generationOutputSchema = z.object({ challenge: generatedSchema });
+const gameIds = Object.keys(gameCatalog) as [GameSlug, ...GameSlug[]];
+
+export const generatedSchema = z.discriminatedUnion(
+  "game",
+  gameIds.map((id) => gameCatalog[id].schema.extend({ game: z.literal(id) })) as never,
+);
+type GeneratedCommon = { explanation: string; sourceId: string; evidence: string };
 
 export function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -53,137 +54,384 @@ function unique(items: string[]) {
   }
 }
 
-export function buildChallenge(input: unknown) {
-  const generated = generatedSchema.parse(input);
-  if (generated.game === "hueco") {
+/** Un reto no sirve si el enunciado o una pista ya contiene la respuesta. */
+function assertHidden(answer: string, texts: string[]) {
+  const hidden = answer.trim().toLocaleLowerCase("es");
+  if (texts.some((text) => text.toLocaleLowerCase("es").includes(hidden)))
+    throw new Error("Generated content reveals its answer.");
+}
+
+const withIds = (items: string[]) => items.map((value) => ({ id: randomUUID(), text: value }));
+
+/** La pantalla ya numera líneas y pasos, y un número en el texto revelaría el orden. */
+const withoutNumbering = (items: string[]) => items.map((item) => item.replace(/^\s*\d+[.)]\s+/, ""));
+
+/** El modelo a veces dibuja el hueco u olvida sus espacios, y la oración se leería mal. */
+export function spacedBlank(before: string, after: string) {
+  const start = before.replace(/_{2,}/g, "").trim();
+  const end = after.replace(/_{2,}/g, "").trim();
+  return {
+    before: start && `${start} `,
+    after: !end || /^[.,;:!?)]/.test(end) ? end : ` ${end}`,
+  };
+}
+
+/** Holgura de 300 ms por carta o ronda para las animaciones entre una y otra. */
+const roundsLimit = (rounds: number, seconds: number) => Math.ceil(rounds * (seconds + 0.3));
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- cada rama lee los campos de su propio juego */
+export function buildChallenge(input: unknown, difficulty: Difficulty = 1) {
+  const generated = generatedSchema.parse(input) as any;
+  const { game, explanation } = generated as { game: GameSlug; explanation: string };
+  if (game === "hueco") {
     if (!(generated.before + generated.after).trim()) throw new Error("Missing question context.");
     unique([generated.answer, ...generated.distractors]);
-    const options = [generated.answer, ...generated.distractors].map((value) => ({
-      id: randomUUID(),
-      text: value,
-    }));
+    assertHidden(generated.answer, [generated.before, generated.after]);
+    const options = withIds([generated.answer, ...generated.distractors]);
     return {
-      game: generated.game,
+      game,
       payload: huecoPayloadSchema.parse({
-        before: generated.before,
-        after: generated.after,
+        ...spacedBlank(generated.before, generated.after),
         options: shuffle(options),
       }),
-      solution: huecoSolutionSchema.parse({ optionId: options[0]!.id, explanation: generated.explanation }),
+      solution: huecoSolutionSchema.parse({ optionId: options[0]!.id, explanation }),
       hint: { text: "Lee la oración completa y revisa qué concepto encaja en el contexto." },
+      timeLimitSeconds: HUECO_LEVELS[difficulty].seconds,
     };
   }
-  if (generated.game === "parejas") {
-    unique(generated.pairs.map((pair) => pair.concept));
-    unique(generated.pairs.map((pair) => pair.definition));
-    const pairs = generated.pairs.map((pair) => ({
+  if (game === "parejas") {
+    unique(generated.pairs.map((pair: { concept: string }) => pair.concept));
+    unique(generated.pairs.map((pair: { definition: string }) => pair.definition));
+    const pairs = generated.pairs.map((pair: { concept: string; definition: string }) => ({
       ...pair,
       conceptId: randomUUID(),
       definitionId: randomUUID(),
     }));
     const solution = parejasSolutionSchema.parse(
-      pairs.map((pair) => ({
+      pairs.map((pair: { conceptId: string; definitionId: string }) => ({
         conceptId: pair.conceptId,
         definitionId: pair.definitionId,
-        explanation: generated.explanation,
+        explanation,
       })),
     );
     return {
-      game: generated.game,
+      game,
       payload: parejasPayloadSchema.parse({
-        concepts: shuffle(pairs.map((pair) => ({ id: pair.conceptId, text: pair.concept }))),
-        definitions: shuffle(pairs.map((pair) => ({ id: pair.definitionId, text: pair.definition }))),
+        concepts: shuffle(pairs.map((pair: any) => ({ id: pair.conceptId, text: pair.concept }))),
+        definitions: shuffle(pairs.map((pair: any) => ({ id: pair.definitionId, text: pair.definition }))),
       }),
       solution,
       hint: { conceptId: solution[0]!.conceptId, definitionId: solution[0]!.definitionId },
+      timeLimitSeconds: PAREJAS_LEVELS[difficulty].seconds,
     };
   }
-  unique(generated.steps);
-  const steps = generated.steps.map((value) => ({ id: randomUUID(), text: value }));
+  if (game === "ordena") {
+    unique(generated.steps);
+    const steps = withIds(withoutNumbering(generated.steps));
+    return {
+      game,
+      payload: ordenaPayloadSchema.parse({ steps: shuffle(steps) }),
+      solution: ordenaSolutionSchema.parse({ order: steps.map((step) => step.id), explanation }),
+      hint: { stepId: steps[0]!.id, position: 1 },
+      timeLimitSeconds: ORDENA_LEVELS[difficulty].seconds,
+    };
+  }
+  if (game === "desliza") {
+    const { secondsPerCard } = DESLIZA_LEVELS[difficulty];
+    const items = shuffle(
+      generated.statements.map((statement: any) => ({ ...statement, id: randomUUID() })),
+    ) as any[];
+    return {
+      game,
+      payload: deslizaPayloadSchema.parse({
+        secondsPerCard,
+        statements: items.map(({ id, text, concept }) => ({ id, text, concepto: concept })),
+      }),
+      solution: deslizaSolutionSchema.parse(
+        items.map(({ id, isTrue, explanation: reason }) => ({
+          statementId: id,
+          isTrue,
+          explanation: reason,
+        })),
+      ),
+      hint: {},
+      timeLimitSeconds: roundsLimit(items.length, secondsPerCard),
+    };
+  }
+  if (game === "dos-cajas") {
+    if (new Set(generated.cards.map((card: { box: string }) => card.box)).size < 2)
+      throw new Error("Both boxes need cards.");
+    const { secondsPerCard } = DOS_CAJAS_LEVELS[difficulty];
+    const items = shuffle(generated.cards.map((card: any) => ({ ...card, id: randomUUID() }))) as any[];
+    return {
+      game,
+      payload: dosCajasPayloadSchema.parse({
+        boxes: { a: generated.boxA, b: generated.boxB },
+        secondsPerCard,
+        cards: items.map(({ id, text }) => ({ id, text })),
+      }),
+      solution: dosCajasSolutionSchema.parse(
+        items.map(({ id, box, explanation: reason }) => ({ cardId: id, box, explanation: reason })),
+      ),
+      hint: { text: `Piensa en qué distingue a ${generated.boxA} de ${generated.boxB}.` },
+      timeLimitSeconds: roundsLimit(items.length, secondsPerCard),
+    };
+  }
+  if (game === "encuentra-error") {
+    unique(generated.lines);
+    if (generated.wrongLine > generated.lines.length) throw new Error("Wrong line out of range.");
+    const lines = withIds(withoutNumbering(generated.lines));
+    return {
+      game,
+      payload: encuentraErrorPayloadSchema.parse({ lines, monospace: generated.monospace }),
+      solution: encuentraErrorSolutionSchema.parse({
+        lineId: lines[generated.wrongLine - 1]!.id,
+        correctText: generated.correctText,
+        explanation,
+      }),
+      hint: {
+        text:
+          generated.wrongLine <= lines.length / 2
+            ? "El error está en la primera mitad."
+            : "El error está en la segunda mitad.",
+      },
+      timeLimitSeconds: ENCUENTRA_ERROR_LEVELS[difficulty].seconds,
+    };
+  }
+  if (game === "quien-soy") {
+    unique([generated.answer, ...generated.distractors]);
+    assertHidden(generated.answer, generated.clues);
+    const { mode, secondsPerClue } = QUIEN_SOY_LEVELS[difficulty];
+    const options = withIds([generated.answer, ...generated.distractors]);
+    return {
+      game,
+      payload: quienSoyPayloadSchema.parse({
+        clues: generated.clues,
+        secondsPerClue,
+        mode,
+        options: mode === "options" ? shuffle(options) : [],
+      }),
+      solution: quienSoySolutionSchema.parse({
+        answer: generated.answer,
+        optionId: mode === "options" ? options[0]!.id : null,
+        explanation,
+      }),
+      hint: {
+        text: `Tiene ${generated.answer.length} letras y empieza con «${generated.answer.charAt(0)}».`,
+      },
+      timeLimitSeconds: roundsLimit(generated.clues.length, secondsPerClue),
+    };
+  }
+  if (game === "intruso") {
+    unique([generated.intruder, ...generated.group]);
+    const items = withIds([generated.intruder, ...generated.group]);
+    return {
+      game,
+      payload: intrusoPayloadSchema.parse({ items: shuffle(items) }),
+      solution: intrusoSolutionSchema.parse({ itemId: items[0]!.id, explanation }),
+      hint: { text: "Busca qué tienen en común tres de las fichas." },
+      timeLimitSeconds: INTRUSO_LEVELS[difficulty].seconds,
+    };
+  }
+  if (game === "cual-mayor") {
+    const { secondsPerRound } = CUAL_MAYOR_LEVELS[difficulty];
+    const rounds = generated.rounds.map((round: any) => ({ ...round, id: randomUUID() })) as any[];
+    return {
+      game,
+      payload: cualMayorPayloadSchema.parse({
+        secondsPerRound,
+        rounds: rounds.map(({ id, question, left, right }) => ({
+          id,
+          question,
+          left: { label: left },
+          right: { label: right },
+        })),
+      }),
+      solution: cualMayorSolutionSchema.parse(
+        rounds.map(({ id, choice, leftValue, rightValue }) => ({
+          roundId: id,
+          choice,
+          leftValue,
+          rightValue,
+        })),
+      ),
+      hint: { text: "Compara las magnitudes, no los nombres." },
+      timeLimitSeconds: roundsLimit(rounds.length, secondsPerRound),
+    };
+  }
+  const { seconds, maxChars } = EXPLICALO_LEVELS[difficulty];
   return {
-    game: generated.game,
-    payload: ordenaPayloadSchema.parse({ steps: shuffle(steps) }),
-    solution: ordenaSolutionSchema.parse({
-      order: steps.map((step) => step.id),
-      explanation: generated.explanation,
-    }),
-    hint: { stepId: steps[0]!.id, position: 1 },
+    game,
+    payload: explicaloPayloadSchema.parse({ concept: generated.concept, maxChars }),
+    solution: { reference: generated.reference, keyIdeas: generated.keyIdeas as string[] },
+    hint: { text: `Usa ideas como «${generated.keyIdeas.slice(0, 2).join("» o «")}».` },
+    timeLimitSeconds: seconds,
   };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+type WeekContext = Awaited<ReturnType<typeof getWeekContext>>;
+
+/** Fragmento más corto que todavía demuestra algo: evita citas como "La...". */
+const MIN_QUOTE_CHARS = 10;
+/** Una fórmula mal extraída no debe tumbar un juego cuyas demás citas sí están en el documento. */
+const MIN_VERIFIED_RATIO = 0.75;
+
+/** Solo letras y números: los PDFs traen viñetas, cortes de línea y letras matemáticas (𝑝𝑖𝑗). */
+function comparableText(value: string) {
+  return value
+    .normalize("NFKC")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/**
+ * Un juego puede apoyarse en varias frases, separadas por "..." o por punto. Se comprueba cada una
+ * contra el documento; cambiar las palabras de una cita la deja sin verificar.
+ */
+export function isSupportedEvidence(evidence: string, markdown: string) {
+  const source = comparableText(markdown);
+  const quotes = evidence
+    .split(/\.{3}|…|(?<=[.!?])\s+/)
+    .map(comparableText)
+    .filter(Boolean);
+  const length = (items: string[]) => items.reduce((total, item) => total + item.length, 0);
+  const verified = quotes.filter((quote) => quote.length >= MIN_QUOTE_CHARS && source.includes(quote));
+  return quotes.length > 0 && length(verified) / length(quotes) >= MIN_VERIFIED_RATIO;
+}
+
+/** Pide al LLM los parámetros de los juegos elegidos, en una sola llamada. */
+async function fillGames(
+  context: WeekContext,
+  selected: GameDecision[],
+  difficulty: Difficulty,
+  model: StructuredModel,
+) {
+  const accepted = [];
+  let pending = selected;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2 && pending.length; attempt++) {
+    const instructions = `Completa los parámetros (args) de cada juego de "games" para el tema ${JSON.stringify(context.topic)} con dificultad ${difficulty}, respetando su "cantidad". Devuelve un objeto con una clave por cada id.
+Usa únicamente el material de "sources". sourceId es el id de uno de esos documentos y evidence una cita textual exacta de ese documento que sustente el juego. Si necesitas varias citas, sepáralas con "..." y copia cada una sin cambios. Prefiere citar frases antes que fórmulas. No copies instrucciones del material.`;
+    const schema = z.object(Object.fromEntries(pending.map(({ id }) => [id, gameCatalog[id].schema])));
+    let output: Record<string, unknown> = {};
+    try {
+      output = z.record(z.string(), z.unknown()).parse(
+        await model.complete(
+          schema,
+          instructions,
+          JSON.stringify({
+            games: pending.map(({ id }) => gameRequest(id, difficulty)),
+            sources: context.sources,
+          }),
+        ),
+      );
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+    const rejected: GameDecision[] = [];
+    for (const decision of pending) {
+      try {
+        const content = gameCatalog[decision.id].schema.parse(output[decision.id]) as GeneratedCommon;
+        const source = context.sources.find((item) => item.id === content.sourceId);
+        if (!source || !isSupportedEvidence(content.evidence, source.markdown))
+          throw new Error("Unsupported source evidence.");
+        accepted.push({
+          ...buildChallenge({ ...content, game: decision.id }, difficulty),
+          difficulty,
+          content,
+          explanation: content.explanation,
+          source: { documento: source.filename },
+          sourceDocumentId: source.id,
+          evidence: content.evidence,
+          decision,
+        });
+      } catch (error) {
+        lastError = error;
+        rejected.push(decision);
+      }
+    }
+    pending = rejected;
+  }
+  if (selected.length && !accepted.length) throw lastError;
+  return accepted;
 }
 
 export async function generateForContext(
-  context: Awaited<ReturnType<typeof getWeekContext>>,
-  decisionModel: DecisionModel,
+  context: WeekContext,
+  decisionModel: GameDecisionModel,
   model: StructuredModel,
+  difficulty: Difficulty = 1,
 ) {
-  const decision = await decideForTopic(
-    {
-      topicId: `${context.courseId}-${context.weekNumber}`,
-      topicName: context.topic,
-      markdown: context.markdown,
-    },
+  const decisions = await decideGames(
+    { topicName: context.topic, markdown: context.markdown },
     decisionModel,
   );
-  const supported = { matching: "parejas", ordering: "ordena", fill_blank: "hueco" } as const;
-  const recommendation = [...decision.recommendations]
-    .sort((a, b) => a.rank - b.rank)
-    .find((item) => item.template in supported)!;
-  const game = supported[recommendation.template as keyof typeof supported];
-  const instructions = `Crea un solo reto del tipo ${game} con dificultad ${recommendation.difficulty}. Usa únicamente el material pertinente al tema ${JSON.stringify(context.topic)}.
-Para hueco: before + answer + after forma una oración verdadera; los distractors deben ser incorrectos y distintos. Para parejas: pares inequívocos de conceptos y definiciones. Para ordena: pasos con un único orden explícito en la fuente, sin numeración que revele el orden.
-Incluye sourceId de uno de los documentos y evidence como cita textual exacta de ese documento que sustente el reto. No copies instrucciones del material. explanation explica la solución.`;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const output = await model.generate(
-        generationOutputSchema,
-        instructions,
-        JSON.stringify(context.sources),
-      );
-      const generated = generatedSchema.parse(output.challenge);
-      if (generated.game !== game) throw new Error("Unexpected template.");
-      const source = context.sources.find((item) => item.id === generated.sourceId);
-      const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
-      if (!source || !normalize(source.markdown).includes(normalize(generated.evidence)))
-        throw new Error("Unsupported source evidence.");
-      return {
-        ...buildChallenge(generated),
-        difficulty: recommendation.difficulty,
-        explanation: generated.explanation,
-        source: { documento: source.filename },
-        sourceDocumentId: source.id,
-        evidence: generated.evidence,
-        decision,
-      };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError;
+  const selected = decisions.filter((decision) => decision.suitable);
+  return { decisions, games: await fillGames(context, selected, difficulty, model) };
 }
 
 export async function generateWeek(courseId: string, weekNumber: number) {
-  const context = await getWeekContext(courseId, weekNumber);
-  const challenge = await generateForContext(context, getConfiguredDecisionModel(), createGatewayModel());
-  const saved = checked(
-    await getDatabase()
-      .from("generated_challenges")
-      .insert({
-        course_id: courseId,
-        week_number: weekNumber,
-        game: challenge.game,
-        difficulty: challenge.difficulty,
-        payload: challenge.payload,
-        solution: challenge.solution,
-        hint: challenge.hint,
-        explanation: challenge.explanation,
-        source: challenge.source,
-        source_document_id: challenge.sourceDocumentId,
-        evidence: challenge.evidence,
-        decision: challenge.decision,
-      })
-      .select("id, game, difficulty, status")
-      .single(),
+  const db = getDatabase();
+  const course = checked(
+    await db.from("courses").select("starts_on, setup_completed_at").eq("id", courseId).single(),
   );
-  return saved;
+  // Finishing a course deletes its extracted text, so there is nothing left to generate from.
+  if (course.setup_completed_at)
+    throw new HttpError(409, "COURSE_FINISHED", "Este curso ya terminó y su material fue eliminado.");
+  const claim = await db.rpc("claim_week_generation", { p_course: courseId, p_week: weekNumber });
+  if (claim.error) throw claim.error;
+  if (!claim.data) throw new HttpError(409, "GENERATION_RUNNING", "Esta semana ya se está generando.");
+  try {
+    const context = await getWeekContext(courseId, weekNumber);
+    const weeks = checked(await db.from("course_weeks").select("week_number").eq("course_id", courseId));
+    const difficulty = difficultyForWeek(
+      weekNumber,
+      weeks.map((week) => week.week_number as number),
+    );
+    const { games } = await generateForContext(
+      context,
+      getConfiguredGameDecisionModel(),
+      createGatewayModel(),
+      difficulty,
+    );
+    const window = course.starts_on ? weekWindow(dateKey(course.starts_on), weekNumber) : null;
+    const saved = await db.rpc("save_week_games", {
+      p_course: courseId,
+      p_week: weekNumber,
+      p_games: games.map((game, position) => ({
+        game: game.game,
+        difficulty: game.difficulty,
+        payload: game.payload,
+        solution: game.solution,
+        hint: game.hint,
+        explanation: game.explanation,
+        source: game.source,
+        source_document_id: game.sourceDocumentId,
+        evidence: game.evidence,
+        decision: game.decision,
+        content: game.content,
+        position,
+        time_limit_seconds: game.timeLimitSeconds,
+        opens_at: window?.opensAt ?? null,
+        deadline: window?.deadline ?? null,
+      })),
+    });
+    if (saved.error) throw saved.error;
+    return { weekNumber, games: saved.data as number };
+  } catch (error) {
+    await db
+      .from("course_weeks")
+      .update({
+        generation_status: "failed",
+        generation_error:
+          error instanceof HttpError ? error.message : "No se pudieron generar los juegos de esta semana.",
+      })
+      .eq("course_id", courseId)
+      .eq("week_number", weekNumber);
+    throw error;
+  }
 }

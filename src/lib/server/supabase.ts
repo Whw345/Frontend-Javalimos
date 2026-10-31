@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getSessionCookie } from "better-auth/cookies";
 import { headers } from "next/headers";
+import { z } from "zod";
 import { auth } from "./auth";
 import { HttpError } from "./errors";
 
@@ -23,6 +24,9 @@ export async function requireUser() {
 
 export async function requireCourse(courseId: string, teacherOnly = false) {
   const userId = await requireUser();
+  if (!z.string().uuid().safeParse(courseId).success) {
+    throw new HttpError(403, "FORBIDDEN", "No tienes permiso para acceder a este curso.");
+  }
   const { data, error } = await getDatabase()
     .from("course_members")
     .select("role, section")

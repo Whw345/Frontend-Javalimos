@@ -1,4 +1,5 @@
 import type { DecisionModel } from "./decide";
+import type { GameDecisionModel } from "./gameDecision";
 
 export class DecisionProviderConfigurationError extends Error {
   constructor(message: string) {
@@ -87,6 +88,23 @@ export function getConfiguredDecisionModel(): DecisionModel {
     apiKey: process.env.DECISION_LLM_API_KEY,
     model: process.env.DECISION_LLM_MODEL,
   });
+}
+
+/** Mismo proveedor que `getConfiguredDecisionModel`, con la pregunta booleana por juego. */
+export function getConfiguredGameDecisionModel(): GameDecisionModel {
+  if (process.env.DECISION_LLM_URL) {
+    const model = getConfiguredDecisionModel();
+    return { ask: (systemPrompt, question) => model.complete(`${systemPrompt}\n\n${question}`) };
+  }
+  return {
+    async ask(systemPrompt, question) {
+      const [{ createGatewayModel }, { gameDecisionSchema }] = await Promise.all([
+        import("../server/model"),
+        import("./gameDecision"),
+      ]);
+      return createGatewayModel().complete(gameDecisionSchema, systemPrompt, question);
+    },
+  };
 }
 
 function isGenericProviderResponse(value: unknown): value is GenericProviderResponse {

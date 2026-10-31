@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { MAX_PDF_BYTES, MAX_PDF_MB } from "@/lib/config";
 import { checkOrigin, handleApi, HttpError } from "@/lib/server/errors";
 import { checked, getDatabase, requireCourse } from "@/lib/server/supabase";
 import { assignDocument, confirmWeeks, suggestWeeks, uploadMaterial } from "@/lib/server/materials";
 
 export const runtime = "nodejs";
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 type Context = { params: Promise<{ courseId: string }> };
 
 export async function GET(_request: Request, { params }: Context) {
@@ -41,7 +43,7 @@ export async function GET(_request: Request, { params }: Context) {
       weeks,
       assignments,
       challenges,
-      suggestedWeeks: syllabus ? suggestWeeks(syllabus.markdown) : [],
+      suggestedWeeks: syllabus?.markdown ? suggestWeeks(syllabus.markdown) : [],
     };
   });
 }
@@ -52,13 +54,15 @@ export async function POST(request: Request, { params }: Context) {
     const { courseId } = await params;
     const { userId } = await requireCourse(courseId, true);
     const contentLength = Number(request.headers.get("content-length"));
-    if (contentLength > 11 * 1024 * 1024)
-      throw new HttpError(413, "INVALID_SIZE", "Carga un PDF de hasta 10 MB por solicitud.");
+    if (contentLength > MAX_PDF_BYTES + MULTIPART_OVERHEAD_BYTES)
+      throw new HttpError(413, "INVALID_SIZE", `Carga un PDF de hasta ${MAX_PDF_MB} MB por solicitud.`);
     const form = await request.formData();
     const kind = z.enum(["syllabus", "theory"]).parse(form.get("kind"));
     const file = form.get("file");
     if (!(file instanceof File)) throw new HttpError(400, "BAD_REQUEST", "Selecciona un PDF.");
-    return uploadMaterial(courseId, userId, kind, file);
+    const week = form.get("week");
+    const weekNumber = week === null ? undefined : z.coerce.number().int().min(1).max(52).parse(week);
+    return uploadMaterial(courseId, userId, kind, file, weekNumber);
   });
 }
 

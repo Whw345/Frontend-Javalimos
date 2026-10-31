@@ -8,16 +8,20 @@ export async function createTestDatabase() {
     create schema auth; create table auth.users(id uuid primary key);
     create schema storage; create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
   `);
-  for (const migration of ["202610300001_learning_pipeline.sql", "202610300002_better_auth.sql"]) {
+  for (const migration of [
+    "202610300001_learning_pipeline.sql",
+    "202610300002_better_auth.sql",
+    "202610300003_drop_legacy_tables.sql",
+    "202610300004_teacher_flow.sql",
+  ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }
   return db;
 }
 
 // Minimal PostgREST test double backed by the actual PostgreSQL migration.
-// Storage is simulated; application queries and RPC functions execute SQL.
+// Application queries and RPC functions execute SQL.
 export function createTestClient(db: PGlite) {
-  const files = new Map<string, File>();
   class Query {
     columns = "*";
     operation = "select";
@@ -41,6 +45,10 @@ export function createTestClient(db: PGlite) {
     update(value: unknown) {
       this.operation = "update";
       this.value = value;
+      return this;
+    }
+    delete() {
+      this.operation = "delete";
       return this;
     }
     eq(column: string, value: unknown) {
@@ -82,6 +90,8 @@ export function createTestClient(db: PGlite) {
             return `${key} = $${parameters.length}`;
           });
           sql = `update ${this.table} set ${updates.join(",")}${where} returning ${this.columns}`;
+        } else if (this.operation === "delete") {
+          sql = `delete from ${this.table}${where}`;
         } else {
           sql = `select ${this.columns} from ${this.table}${where}${this.sort}`;
         }
@@ -96,7 +106,6 @@ export function createTestClient(db: PGlite) {
     }
   }
   return {
-    files,
     from: (table: string) => new Query(table),
     async rpc(name: string, args: Record<string, unknown>) {
       try {
@@ -109,18 +118,6 @@ export function createTestClient(db: PGlite) {
       } catch (error) {
         return { data: null, error };
       }
-    },
-    storage: {
-      from: () => ({
-        upload: async (path: string, file: File) => {
-          files.set(path, file);
-          return { data: { path }, error: null };
-        },
-        remove: async (paths: string[]) => {
-          paths.forEach((path) => files.delete(path));
-          return { data: [], error: null };
-        },
-      }),
     },
   };
 }

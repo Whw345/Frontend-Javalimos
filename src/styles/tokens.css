@@ -15,45 +15,51 @@
   --color-*: initial;
 
   /* Superficies — tema oscuro por defecto */
-  --color-bg: #0b0b1e;
-  --color-surface: #14143a;
-  --color-surface-raised: #1e1b4b;
-  --color-surface-sunken: #08081a;
-  --color-border: #2e2a6b;
-  --color-border-strong: #4b44a8;
+  --color-bg: #121212;
+  --color-surface: #1e1e1e;
+  --color-surface-raised: #2a2a2a;
+  --color-surface-sunken: #0a0a0a;
+  --color-border: #333333;
+  --color-border-strong: #4d4d4d;
 
   /* Texto */
-  --color-text: #f4f2ff;
-  --color-text-secondary: #bdb8e0;
-  --color-text-muted: #8e89b8;
-  --color-text-on-primary: #ffffff;
-  --color-text-on-reward: #1a0f00;
+  --color-text: #fff4ea;
+  --color-text-secondary: #bdbdbd;
+  --color-text-muted: #8f8f8f;
+  --color-text-on-primary: #121212;
+  --color-text-on-reward: #121212;
 
   /* Marca y acción */
-  --color-primary: #7c5cff;
-  --color-primary-hover: #6b48f5;
-  --color-primary-soft: #7c5cff26;
-  --color-primary-glow: #7c5cff66;
-  --color-reward: #ff9f45;
-  --color-reward-soft: #ff9f4526;
-  --color-highlight: #ff6b8b;
+  --color-primary: #ff6b2c;
+  --color-primary-hover: #ff8247;
+  --color-primary-text: #ff8a57;
+  --color-primary-soft: #ff6b2c1f;
+  --color-primary-glow: #ff6b2c59;
+  --color-reward: #ffd23f;
+  --color-reward-soft: #ffd23f1f;
+  --color-highlight: #ff4d6d;
+  --color-brand-cream: #fff4ea;
+  --color-brand-chocolate: #7a4e36;
+  --color-brand-ink: #121212;
 
   /* Estados semánticos */
-  --color-success: #2ee6a6;
-  --color-success-soft: #2ee6a626;
-  --color-error: #ff5c70;
-  --color-error-soft: #ff5c7026;
-  --color-warning: #ffc94d;
+  --color-success: #7ee081;
+  --color-success-soft: #7ee0811f;
+  --color-timer: #ff4d6d;
+  --color-error: #ff4d6d;
+  --color-error-soft: #ff4d6d1f;
+  --color-warning: #ffb547;
   --color-info: #5cc8ff;
 
   /* Categorías (siempre con forma + letra, §14) */
-  --color-cat-1: #7c5cff;
-  --color-cat-2: #ff9f45;
-  --color-cat-3: #2ee6a6;
+  --color-cat-1: #ff6b2c;
+  --color-cat-2: #ffd23f;
+  --color-cat-3: #7ee081;
   --color-cat-4: #5cc8ff;
-  --color-cat-5: #ff6b8b;
+  --color-cat-5: #c792ea;
 
   /* Tipografía (las variables --font-sora/inter/jetbrains las inyecta next/font) */
+  --font-logo: var(--font-archivo-black), system-ui, sans-serif;
   --font-display: var(--font-sora), system-ui, sans-serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
@@ -69,8 +75,8 @@
   --shadow-md: 0 8px 24px #00000059;
   --shadow-lg: 0 16px 48px #00000073;
   --shadow-glow-primary: 0 0 0 4px var(--color-primary-glow);
-  --shadow-glow-success: 0 0 24px #2ee6a666;
-  --shadow-glow-reward: 0 0 24px #ff9f4566;
+  --shadow-glow-success: 0 0 24px #7ee08166;
+  --shadow-glow-reward: 0 0 24px #ffd23f66;
 
   /* Movimiento */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -121,27 +127,31 @@
   --z-modal: 50;
   --z-toast: 60;
 
-  --gradient-night: linear-gradient(180deg, #1e1b4b 0%, #0b0b1e 100%);
-  --gradient-dusk: linear-gradient(135deg, #7c5cff 0%, #ff6b8b 60%, #ff9f45 100%);
-  --gradient-reward: linear-gradient(135deg, #ff9f45 0%, #ff6b8b 100%);
+  --gradient-night: linear-gradient(180deg, #1e1e1e 0%, #121212 100%);
+  --gradient-dusk: linear-gradient(135deg, #ff6b2c 0%, #ff4d6d 100%);
+  --gradient-reward: linear-gradient(135deg, #ffd23f 0%, #ff6b2c 100%);
 }
 
 [data-theme="light"] {
-  --color-bg: #f7f6ff;
+  --color-bg: #fafafa;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #eeecfb;
-  --color-border: #dedaf5;
-  --color-border-strong: #b3a9f0;
-  --color-text: #14123a;
-  --color-text-secondary: #4a4675;
-  --color-text-muted: #6e6a99;
-  --color-primary: #6040f0;
-  --color-reward: #d96e10;
-  --color-success: #0f9e6e;
-  --color-error: #d92d45;
-  --color-warning: #b98200;
-  --color-info: #1e8bc3;
+  --color-surface-sunken: #f0f0f0;
+  --color-border: #e3e3e3;
+  --color-border-strong: #c7c7c7;
+  --color-text: #121212;
+  --color-text-secondary: #4a4a4a;
+  --color-text-muted: #6b6b6b;
+  --color-text-on-primary: #ffffff;
+  --color-primary: #c2410c;
+  --color-primary-hover: #a8380a;
+  --color-primary-text: #c2410c;
+  --color-reward: #ffd23f;
+  --color-success: #1e7b34;
+  --color-timer: #c9184a;
+  --color-error: #c9184a;
+  --color-warning: #a15c00;
+  --color-info: #0b6fa4;
 }
 
 /* Escala tipográfica §5: valor base = móvil/tablet, desde lg (1024 px) = desktop. */
@@ -154,6 +164,11 @@
     font-size: 3.5rem;
     line-height: 4rem;
   }
+}
+
+@utility type-logo {
+  font-family: var(--font-logo);
+  font-weight: 400;
 }
 
 @utility type-display {
