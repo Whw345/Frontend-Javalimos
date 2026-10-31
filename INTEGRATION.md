@@ -27,7 +27,7 @@ GOOGLE_CLIENT_SECRET=SECRETO_DE_GOOGLE
 
 No uses `NEXT_PUBLIC_` para las claves. `DECISION_LLM_*` sigue disponible para el adaptador HTTP de decisión del equipo; sin esa URL se utiliza LangChain con AI Gateway para decidir. El relleno de juegos utiliza AI Gateway.
 
-En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql` y `202610300004_teacher_flow.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
+En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql` y `202610300005_teachers.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
 
 ```powershell
 pnpm dev
@@ -35,11 +35,20 @@ pnpm dev
 
 Abre [Ingresar](http://localhost:3000/ingresar). La sesión la gestiona Better Auth con una cookie HTTP-only; al vencer debes volver a ingresar.
 
+## Dar de alta un docente
+
+El registro público crea cuentas de alumno. Para que una cuenta pueda crear cursos, regístrala en `/ingresar` y agrégala desde SQL Editor:
+
+```sql
+insert into public.teachers(user_id)
+select id from public."user" where lower(email) = 'CORREO-DEL-DOCENTE';
+```
+
 ## Recorrido del docente
 
-1. Ingresa con Google o con correo y contraseña («Crear una cuenta» la primera vez). Llegas a `/docente`, con tus cursos en tarjetas y una tarjeta «Crear curso».
+1. Ingresa con Google o con correo y contraseña. Llegas a `/cursos`, con tus cursos en tarjetas y una tarjeta «Crear curso». Esa tarjeta solo aparece para docentes.
 2. «Crear curso» abre `/docente/nuevo`. Escribe el nombre y agrega PDFs con **+** (selector del sistema, solo PDF) o arrastrándolos a la ventana. Cada PDF entra como S1; cambia la semana en su selector y bórralo con el tacho si hace falta. Son válidos `fixtures/teoria.pdf` y `fixtures/silabo.pdf`, materiales ficticios.
-3. «Subir» crea el curso (quien lo crea queda como docente), convierte cada PDF a Markdown con MarkItDown y lo asocia a su semana. El nombre del PDF es el tema de la semana. Cada PDF puede pesar hasta 4 MB y no se guarda; el Markdown se conserva solo para generar y reintentar, y se borra al pulsar «Terminar».
+3. «Subir» crea el curso (quien lo crea queda como su docente), convierte cada PDF a Markdown con MarkItDown y lo asocia a su semana. El nombre del PDF es el tema de la semana. Cada PDF puede pesar hasta 4 MB y no se guarda; el Markdown se conserva solo para generar y reintentar, y se borra al pulsar «Terminar».
 4. `/docente/ID-DEL-CURSO/camino` genera una semana a la vez, para respetar el límite de llamadas por minuto de AI Gateway, y resume donde quedó si recargas:
    - Con el Markdown de la semana en el System Prompt, el modelo de decisión responde en una sola llamada un booleano por cada uno de los 10 juegos: recibe un mapa `questions` con su `id` y descripción y devuelve `answers` bajo los mismos ids (`src/lib/decision/gameDecision.ts`).
    - Los juegos marcados se envían en una sola llamada como `{ id, args: [...] }` (`src/lib/games/catalog.ts`) para que el LLM complete sus parámetros. Cada juego se valida con Zod, con sus citas del documento (se comparan solo letras y números, y al menos el 75 % del texto citado debe estar en el PDF), con la consistencia de sus opciones y con que el enunciado no revele la respuesta; los rechazados se reintentan una vez sin descartar los válidos.
@@ -56,7 +65,7 @@ insert into public.course_members(course_id, user_id, role, section) values
 ('ID-DEL-CURSO', 'ID-DEL-ESTUDIANTE', 'student', 'A');
 ```
 
-El curso aparece en `/docente` con la etiqueta «Estudiante» y lleva a `/cursos/ID-DEL-CURSO/practicar`. Solo se juegan los retos de la semana en curso, dentro de su ventana. La sesión recibe opciones sin solución ni cita que revele la respuesta. Acierto: 10 puntos; con pista: 5; error o tiempo agotado: 0. Cada reto tiene un solo intento y hay un máximo de 10 por semana. El tiempo, el cupo y los puntos se controlan en servidor y mediante transacciones SQL. «Explícalo en una frase» se evalúa con el LLM después del intento.
+El curso aparece en `/cursos` con la etiqueta «Estudiante» y lleva a `/cursos/ID-DEL-CURSO/practicar`. Solo se juegan los retos de la semana en curso, dentro de su ventana. La sesión recibe opciones sin solución ni cita que revele la respuesta. Acierto: 10 puntos; con pista: 5; error o tiempo agotado: 0. Cada reto tiene un solo intento y hay un máximo de 10 por semana. El tiempo, el cupo y los puntos se controlan en servidor y mediante transacciones SQL. «Explícalo en una frase» se evalúa con el LLM después del intento.
 
 El flujo anterior con sílabo sigue disponible en `/docente/ID-DEL-CURSO/material`.
 

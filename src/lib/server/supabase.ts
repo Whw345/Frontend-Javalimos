@@ -22,6 +22,23 @@ export async function requireUser() {
   return session.user.id;
 }
 
+export async function isTeacher(userId: string) {
+  const { data, error } = await getDatabase()
+    .from("teachers")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function requireTeacher() {
+  const userId = await requireUser();
+  if (!(await isTeacher(userId)))
+    throw new HttpError(403, "FORBIDDEN", "Tu cuenta no tiene permiso para crear cursos.");
+  return userId;
+}
+
 export async function requireCourse(courseId: string, teacherOnly = false) {
   const userId = await requireUser();
   if (!z.string().uuid().safeParse(courseId).success) {

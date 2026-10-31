@@ -55,7 +55,7 @@ export function PublishedChallenges({ courseId }: { courseId: string }) {
       <main>
         <h1>{data?.course.name ?? "Retos del curso"}</h1>
         <p role="status">{message}</p>
-        <Link href="/docente">Volver a mis cursos</Link>
+        <Link href="/cursos">Volver a mis cursos</Link>
         {data && (
           <section>
             <h2>Semana {data.course.current_week}</h2>

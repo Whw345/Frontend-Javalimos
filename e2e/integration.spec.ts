@@ -45,6 +45,7 @@ function mockTeacherApi(page: Page) {
       }
       return route.fulfill({
         json: {
+          canCreateCourses: true,
           courses: state.name
             ? [
                 {
@@ -125,7 +126,7 @@ test("a teacher signs in, creates a course from PDFs, edits the path and finishe
   await page.getByLabel("Contraseña").fill("fixture-password");
   await page.getByRole("button", { name: "Ingresar", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/docente$/);
+  await expect(page).toHaveURL(/\/cursos$/);
   await expect(page.getByRole("heading", { name: "Mis cursos" })).toBeVisible();
   await page.screenshot({ path: "test-results/cursos-vacio.png" });
   await page.getByRole("link", { name: /Crear curso/ }).click();
@@ -184,6 +185,25 @@ test("a teacher signs in, creates a course from PDFs, edits the path and finishe
   await page.getByRole("link", { name: "Volver a mis cursos" }).last().click();
   await expect(page.getByRole("link", { name: /Biología/ })).toBeVisible();
   await page.screenshot({ path: "test-results/cursos.png" });
+});
+
+test("a student sees their courses but cannot create one", async ({ page }) => {
+  await page.route("**/api/courses", (route) =>
+    route.fulfill({
+      json: {
+        canCreateCourses: false,
+        courses: [
+          { id: courseId, name: "Biología", role: "student", setupCompleted: true, weeks: 2, games: 7 },
+        ],
+      },
+    }),
+  );
+  await page.goto("/cursos");
+  const course = page.getByRole("link", { name: /Biología/ });
+  await expect(course).toHaveAttribute("href", `/cursos/${courseId}/practicar`);
+  await expect(page.getByRole("link", { name: /Crear curso/ })).toHaveCount(0);
+  await page.goto("/docente/nuevo");
+  await expect(page).toHaveURL(/\/cursos$/);
 });
 
 test("a published challenge renders the existing Hueco GameShell and submits for feedback", async ({

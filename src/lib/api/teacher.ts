@@ -64,7 +64,10 @@ const json = (method: string, data: unknown): RequestInit => ({
 const coursePath = (courseId: string) => `/api/courses/${encodeURIComponent(courseId)}`;
 
 export const getCourses = () =>
-  teacherRequest("/api/courses", z.object({ courses: z.array(courseCardSchema) }));
+  teacherRequest(
+    "/api/courses",
+    z.object({ canCreateCourses: z.boolean(), courses: z.array(courseCardSchema) }),
+  );
 
 export const createCourse = (name: string) =>
   teacherRequest("/api/courses", z.object({ id: z.string() }), json("POST", { name }));

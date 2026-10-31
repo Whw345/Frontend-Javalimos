@@ -49,7 +49,7 @@ export function CourseAdmin({ courseId }: { courseId: string }) {
                 title={t.admin.empty}
                 description={t.admin.emptyHint}
                 action={
-                  <Link href="/docente" className={buttonVariants({ variant: "secondary" })}>
+                  <Link href="/cursos" className={buttonVariants({ variant: "secondary" })}>
                     {t.backToCourses}
                   </Link>
                 }
