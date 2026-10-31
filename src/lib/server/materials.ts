@@ -41,19 +41,27 @@ export function suggestWeeks(markdown: string) {
   return weeks;
 }
 
+/** Nombre legible del PDF: es el tema de la semana mientras el docente no indique otro. */
+export function topicFromFilename(filename: string, weekNumber: number) {
+  const topic = filename
+    .replace(/\.pdf$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+  return topic.length >= 3 ? topic : `Semana ${weekNumber}`;
+}
+
 export async function uploadMaterial(
   courseId: string,
   userId: string,
   kind: "syllabus" | "theory",
   file: File,
+  weekNumber?: number,
 ) {
   const markdown = await extractPdf(file);
   const db = getDatabase();
   const id = crypto.randomUUID();
-  const storagePath = `${courseId}/${id}.pdf`;
-  checked(
-    await db.storage.from("course-materials").upload(storagePath, file, { contentType: "application/pdf" }),
-  );
   try {
     checked(
       await db.from("course_documents").insert({
@@ -63,11 +71,20 @@ export async function uploadMaterial(
         kind,
         filename: file.name.slice(0, 200),
         markdown,
-        storage_path: storagePath,
       }),
     );
+    if (weekNumber !== undefined) {
+      checked(
+        await db.rpc("attach_document_week", {
+          p_course: courseId,
+          p_document: id,
+          p_week: weekNumber,
+          p_topic: topicFromFilename(file.name, weekNumber),
+        }),
+      );
+    }
   } catch (error) {
-    await db.storage.from("course-materials").remove([storagePath]);
+    await db.from("course_documents").delete().eq("id", id);
     throw error;
   }
   return {

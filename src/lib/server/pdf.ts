@@ -2,13 +2,16 @@ import "server-only";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { MAX_PDF_BYTES, MAX_PDF_MB } from "@/lib/config";
 import { HttpError } from "./errors";
-
-export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 export async function extractPdf(file: File): Promise<string> {
   if (file.size === 0 || file.size > MAX_PDF_BYTES) {
-    throw new HttpError(413, "INVALID_SIZE", "El PDF debe tener contenido y pesar como máximo 10 MB.");
+    throw new HttpError(
+      413,
+      "INVALID_SIZE",
+      `El PDF debe tener contenido y pesar como máximo ${MAX_PDF_MB} MB.`,
+    );
   }
   if (file.type !== "application/pdf" || !file.name.toLowerCase().endsWith(".pdf")) {
     throw new HttpError(415, "INVALID_PDF", "Selecciona un archivo PDF.");

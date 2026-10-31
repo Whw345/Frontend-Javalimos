@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { getGameDefinition } from "@/games/registry";
 import { createChallenge } from "@/lib/api/challenges";
 import type { CreateChallengeBody } from "@/lib/api/schemas";
 import styles from "./Workspace.module.css";
@@ -54,7 +55,7 @@ export function PublishedChallenges({ courseId }: { courseId: string }) {
       <main>
         <h1>{data?.course.name ?? "Retos del curso"}</h1>
         <p role="status">{message}</p>
-        <Link href="/ingresar">Cambiar sesión</Link>
+        <Link href="/docente">Volver a mis cursos</Link>
         {data && (
           <section>
             <h2>Semana {data.course.current_week}</h2>
@@ -63,12 +64,7 @@ export function PublishedChallenges({ courseId }: { courseId: string }) {
             {data.challenges.map((challenge) => (
               <article key={challenge.id}>
                 <h3>
-                  {
-                    ({ hueco: "Hueco", parejas: "Parejas", ordena: "Ordena" } as Record<string, string>)[
-                      challenge.game
-                    ]
-                  }{" "}
-                  · Nivel {challenge.difficulty}
+                  {getGameDefinition(challenge.game)?.name} · Nivel {challenge.difficulty}
                 </h3>
                 <Button loading={busy} onClick={() => play(challenge)}>
                   Jugar

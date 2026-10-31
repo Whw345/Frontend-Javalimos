@@ -26,12 +26,12 @@ alter table public.challenge_sessions drop constraint challenge_sessions_user_id
   alter column user_id type text,
   add foreign key (user_id) references public."user";
 
-drop function public.course_progress(text, uuid);
-drop function public.start_challenge(text, uuid, text, integer, uuid);
+drop function public.course_progress(uuid, uuid);
+drop function public.start_challenge(uuid, uuid, text, integer, uuid);
 drop function public.reveal_session_hint(uuid, uuid);
 drop function public.finish_challenge(uuid, uuid, boolean, jsonb);
 
-create function public.course_progress(p_course text, p_user text) returns jsonb
+create function public.course_progress(p_course uuid, p_user text) returns jsonb
 language sql security invoker set search_path = public as $$
   select jsonb_build_object(
     'points', coalesce(sum(s.points), 0),
@@ -42,7 +42,7 @@ language sql security invoker set search_path = public as $$
   where c.id = p_course group by c.current_week;
 $$;
 
-create function public.start_challenge(p_course text, p_user text, p_game text, p_difficulty integer, p_challenge uuid default null)
+create function public.start_challenge(p_course uuid, p_user text, p_game text, p_difficulty integer, p_challenge uuid default null)
 returns jsonb language plpgsql security invoker set search_path = public as $$
 declare
   active_week integer;
@@ -54,7 +54,7 @@ begin
     raise exception 'FORBIDDEN';
   end if;
   select current_week into active_week from courses where id = p_course;
-  perform pg_advisory_xact_lock(hashtextextended(p_course || p_user || active_week::text, 0));
+  perform pg_advisory_xact_lock(hashtextextended(p_course::text || p_user || active_week::text, 0));
   select count(*) into played from challenge_sessions where course_id = p_course and user_id = p_user and week_number = active_week;
   if played >= 10 then raise exception 'WEEKLY_LIMIT_REACHED'; end if;
   select * into selected from generated_challenges g where g.course_id = p_course
@@ -99,7 +99,7 @@ begin
 end;
 $$;
 
-revoke all on function public.course_progress(text, text), public.start_challenge(text, text, text, integer, uuid),
+revoke all on function public.course_progress(uuid, text), public.start_challenge(uuid, text, text, integer, uuid),
   public.reveal_session_hint(uuid, text), public.finish_challenge(uuid, text, boolean, jsonb) from public, anon, authenticated;
-grant execute on function public.course_progress(text, text), public.start_challenge(text, text, text, integer, uuid),
+grant execute on function public.course_progress(uuid, text), public.start_challenge(uuid, text, text, integer, uuid),
   public.reveal_session_hint(uuid, text), public.finish_challenge(uuid, text, boolean, jsonb) to service_role;

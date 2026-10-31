@@ -4,6 +4,7 @@ import { checked, getDatabase, requireCourse } from "@/lib/server/supabase";
 import { generateWeek } from "@/lib/server/generation";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 type Context = { params: Promise<{ courseId: string }> };
 export async function POST(request: Request, { params }: Context) {
   return handleApi(async () => {

@@ -121,10 +121,7 @@ export function TeacherWorkspace({ courseId }: { courseId: string }) {
           <>
             <section>
               <h2>1. Carga el sílabo y la teoría</h2>
-              <p>
-                PDF con texto seleccionable, hasta 10 MB por archivo. Los originales se guardan de forma
-                privada.
-              </p>
+              <p>PDF con texto seleccionable, hasta 4 MB por archivo. Los originales no se guardan.</p>
               <form onSubmit={upload}>
                 <label>
                   Tipo de material

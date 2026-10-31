@@ -1,25 +1,30 @@
 "use client";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
-import styles from "@/components/materials/Workspace.module.css";
+import { Input } from "@/components/ui/Input";
+import { copy } from "@/content/copy";
 import { authClient } from "@/lib/auth-client";
+
+const t = copy.auth;
+const AFTER_LOGIN = "/docente";
 
 function oauthMessage(error: string | null) {
   if (!error) return "";
-  return error === "account_not_linked"
-    ? "Este correo ya tiene una cuenta. Ingresa con tu contraseña."
-    : "No se pudo ingresar con Google. Inténtalo de nuevo.";
+  return error === "account_not_linked" ? t.existingAccount : t.googleFailed;
 }
 
 function LoginForm() {
+  const router = useRouter();
   const oauthError = useSearchParams().get("error");
-  const { data: session, refetch } = authClient.useSession();
+  const { data: session } = authClient.useSession();
   const [message, setMessage] = useState(() => oauthMessage(oauthError));
   const [busy, setBusy] = useState(false);
   const [signingUp, setSigningUp] = useState(false);
-  const [courseId, setCourseId] = useState("bio-101");
+  useEffect(() => {
+    if (session) router.replace(AFTER_LOGIN);
+  }, [session, router]);
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -31,13 +36,12 @@ function LoginForm() {
         ? await authClient.signUp.email({ name: String(data.get("name")), email, password })
         : await authClient.signIn.email({ email, password });
       if (error) {
-        setMessage(signingUp ? "No se pudo crear la cuenta." : "Correo o contraseña incorrectos.");
+        setMessage(signingUp ? t.signUpFailed : t.badCredentials);
       } else {
-        setMessage("Sesión iniciada. Elige cómo continuar.");
-        refetch();
+        router.replace(AFTER_LOGIN);
       }
     } catch {
-      setMessage("No se pudo conectar con el servidor.");
+      setMessage(t.offline);
     } finally {
       setBusy(false);
     }
@@ -46,7 +50,7 @@ function LoginForm() {
     setBusy(true);
     const { error } = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/ingresar",
+      callbackURL: AFTER_LOGIN,
       errorCallbackURL: "/ingresar",
     });
     if (error) {
@@ -54,30 +58,29 @@ function LoginForm() {
       setBusy(false);
     }
   }
-  async function logout() {
-    await authClient.signOut();
-    setMessage("Sesión cerrada.");
-    refetch();
-  }
   return (
-    <div className={styles.workspace}>
-      <main>
-        <h1>Ingresa a Javalimos</h1>
-        <section>
-          <form onSubmit={login}>
+    <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8">
+      <main className="flex w-full max-w-md flex-col gap-6">
+        <Logo tagline className="self-center" />
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 lg:p-6">
+          <div>
+            <h1 className="type-h2 text-text">{t.title}</h1>
+            <p className="mt-1 type-body text-text-secondary">{t.subtitle}</p>
+          </div>
+          <form onSubmit={login} className="flex flex-col gap-4">
             {signingUp && (
-              <label>
-                Nombre
-                <input name="name" required autoComplete="name" />
+              <label className="flex flex-col gap-2 type-label text-text-secondary">
+                {t.name}
+                <Input name="name" required autoComplete="name" />
               </label>
             )}
-            <label>
-              Correo institucional
-              <input name="email" type="email" required autoComplete="username" />
+            <label className="flex flex-col gap-2 type-label text-text-secondary">
+              {t.email}
+              <Input name="email" type="email" required autoComplete="username" />
             </label>
-            <label>
-              Contraseña
-              <input
+            <label className="flex flex-col gap-2 type-label text-text-secondary">
+              {t.password}
+              <Input
                 name="password"
                 type="password"
                 required
@@ -85,33 +88,20 @@ function LoginForm() {
                 autoComplete={signingUp ? "new-password" : "current-password"}
               />
             </label>
-            <Button type="submit" loading={busy}>
-              {signingUp ? "Crear cuenta" : "Ingresar"}
+            <Button type="submit" size="lg" loading={busy}>
+              {signingUp ? t.signUp : t.signIn}
             </Button>
           </form>
           <Button type="button" variant="secondary" disabled={busy} onClick={loginWithGoogle}>
-            Continuar con Google
+            {t.google}
           </Button>
           <Button type="button" variant="ghost" onClick={() => setSigningUp(!signingUp)}>
-            {signingUp ? "Ya tengo una cuenta" : "Crear una cuenta"}
+            {signingUp ? t.toSignIn : t.toSignUp}
           </Button>
-          <p role="status">
-            {message || (session ? `Sesión iniciada como ${session.user.email}. Elige cómo continuar.` : "")}
+          <p role="status" className="type-body text-text-secondary empty:hidden">
+            {message}
           </p>
-          {session && (
-            <Button type="button" variant="ghost" onClick={logout}>
-              Cerrar sesión
-            </Button>
-          )}
-        </section>
-        <section>
-          <label>
-            Identificador del curso
-            <input value={courseId} onChange={(event) => setCourseId(event.target.value)} />
-          </label>
-          <Link href={`/docente/${encodeURIComponent(courseId)}`}>Gestionar material como docente</Link>
-          <Link href={`/cursos/${encodeURIComponent(courseId)}/practicar`}>Practicar retos publicados</Link>
-        </section>
+        </div>
       </main>
     </div>
   );
