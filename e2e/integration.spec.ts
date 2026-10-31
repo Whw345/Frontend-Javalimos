@@ -20,6 +20,8 @@ function mockTeacherApi(page: Page) {
       generationStatus: state.generated.includes(weekNumber) ? "done" : "pending",
       generationError: null,
       deadline: weekNumber === 1 ? "2026-11-09T05:00:00.000Z" : "2026-11-16T05:00:00.000Z",
+      future: weekNumber > 1,
+      unlocked: false,
       games: !state.generated.includes(weekNumber)
         ? []
         : weekNumber === 1
@@ -220,6 +222,8 @@ test("a teacher opens a course in three tabs: ranking, students and games", asyn
         generationStatus: "done",
         generationError: null,
         deadline: null,
+        future: false,
+        unlocked: false,
         games: [{ id: gameId, game: "hueco", difficulty: 1, status: setupCompleted ? "published" : "draft" }],
       },
     ],
@@ -347,6 +351,93 @@ test("a teacher opens a course in three tabs: ranking, students and games", asyn
   await expect(page).toHaveURL(/\/docente\/in-setup$/);
   await expect(page.getByRole("tab", { name: "Juegos" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("button", { name: "Terminar" })).toBeEnabled();
+});
+
+test("a teacher unlocks a future week ahead of time and can lock it again", async ({ page }) => {
+  let unlocked = false;
+  const requests: unknown[] = [];
+  const week = (weekNumber: number, future: boolean, status: string) => ({
+    weekNumber,
+    topic: `Tema ${weekNumber} con un título largo que ocupa dos líneas en la tarjeta`,
+    generationStatus: "done",
+    generationError: null,
+    deadline: "2026-11-16T05:00:00.000Z",
+    future,
+    unlocked: weekNumber === 2 && unlocked,
+    games: [{ id: `g${weekNumber}`, game: "hueco", difficulty: 1, status }],
+  });
+  await page.route("**/api/courses/*/leaderboard", (route) => route.fulfill({ json: { leaderboard: [] } }));
+  await page.route(`**/api/courses/${courseId}`, (route) => {
+    if (route.request().method() === "PATCH") {
+      const body = route.request().postDataJSON();
+      requests.push(body);
+      unlocked = body.unlocked;
+      return route.fulfill({ json: body });
+    }
+    return route.fulfill({
+      json: {
+        course: { id: courseId, name: "Biología", setupCompleted: true },
+        weeks: [week(1, false, "published"), week(2, true, "published"), week(3, true, "discarded")],
+      },
+    });
+  });
+
+  await page.goto(`/docente/${courseId}`);
+  await page.getByRole("tab", { name: "Juegos" }).click();
+  await expect(page.getByRole("button", { name: /semana 1 para/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /semana 3 para/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Desbloquear la semana 2 para tus alumnos" }).click();
+  await expect(page.getByText(/^Abierta · vence/)).toBeVisible();
+  await page.screenshot({ path: "test-results/semana-desbloqueada.png", fullPage: true });
+
+  await page.getByRole("button", { name: "Volver a bloquear la semana 2" }).click();
+  await expect(page.getByRole("button", { name: "Desbloquear la semana 2 para tus alumnos" })).toBeVisible();
+  expect(requests).toEqual([
+    { weekNumber: 2, unlocked: true },
+    { weekNumber: 2, unlocked: false },
+  ]);
+});
+
+test("a student plays an unlocked week alongside the current one", async ({ page }) => {
+  await page.route(`**/api/courses/${courseId}/progress`, (route) =>
+    route.fulfill({ json: { points: 10, streakDays: 0, weeklyPlayed: 1, weeklyLimit: 2 } }),
+  );
+  await page.route(`**/api/courses/${courseId}/challenges`, (route) =>
+    route.fulfill({
+      json: {
+        course: { name: "Biología", current_week: 1 },
+        weeks: [
+          {
+            weekNumber: 1,
+            state: "current",
+            topic: "Células",
+            opensAt: null,
+            deadline: "2026-11-09T05:00:00.000Z",
+            hiddenGames: 0,
+            games: [{ id: gameId, game: "hueco", difficulty: 1, status: "played", points: 10 }],
+          },
+          {
+            weekNumber: 2,
+            state: "unlocked",
+            topic: "Fotosíntesis",
+            opensAt: "2026-11-09T05:00:00.000Z",
+            deadline: "2026-11-16T05:00:00.000Z",
+            hiddenGames: 0,
+            games: [{ id: "g2", game: "hueco", difficulty: 1, status: "available", points: null }],
+          },
+        ],
+      },
+    }),
+  );
+
+  await page.goto(`/cursos/${courseId}/practicar`);
+  await expect(page.getByText("Adelantada")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fotosíntesis" })).toBeVisible();
+  await expect(page.getByText(/Jugaste todos los retos/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Hueco, semana 2" }).click();
+  await expect(page.getByRole("button", { name: "Jugar" })).toBeEnabled();
+  await page.screenshot({ path: "test-results/semana-adelantada.png", fullPage: true });
 });
 
 test("a student sees their courses but cannot create one", async ({ page }) => {
@@ -490,6 +581,7 @@ test("a published challenge renders the existing Hueco GameShell and submits for
   await page.waitForTimeout(300);
   await page.screenshot({ path: "test-results/casilla-abierta.png" });
   await page.getByRole("button", { name: "Jugar", exact: true }).click();
+  await page.getByRole("button", { name: "Jugar directamente" }).click();
   await expect(page).toHaveURL(/\/reto\/fixture-session$/);
   await page.getByRole("button", { name: /mitocondria/i }).click();
   await expect(page.getByRole("button", { name: "Continuar" })).toBeVisible();

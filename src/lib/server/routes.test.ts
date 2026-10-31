@@ -4,7 +4,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { createTestClient, createTestDatabase } from "@/test/database";
 import { POST as upload, PATCH as editMaterial } from "@/app/api/courses/[courseId]/materials/route";
 import { GET as listCourses, POST as createCourse } from "@/app/api/courses/route";
-import { DELETE as archive, GET as getPath } from "@/app/api/courses/[courseId]/route";
+import { DELETE as archive, GET as getPath, PATCH as unlockWeek } from "@/app/api/courses/[courseId]/route";
 import { POST as finish } from "@/app/api/courses/[courseId]/finish/route";
 import { GET as getGame, PATCH as editGame } from "@/app/api/courses/[courseId]/games/[gameId]/route";
 import { GET as getLeaderboard } from "@/app/api/courses/[courseId]/leaderboard/route";
@@ -645,6 +645,121 @@ it("lets an assigned student play only the current week, from before the first M
 
   state.userId = outsider;
   expect((await list()).status).toBe(403);
+}, 30_000);
+
+it("lets a teacher open a future week early without moving the calendar of the course", async () => {
+  const id = "abababab-abab-4bab-8bab-ababababab07";
+  const documentId = "abababab-abab-4bab-8bab-ababababab08";
+  const current = "abababab-abab-4bab-8bab-ababababab01";
+  const early = "abababab-abab-4bab-8bab-ababababab02";
+  const draftWeek = "abababab-abab-4bab-8bab-ababababab03";
+  const expired = "abababab-abab-4bab-8bab-ababababab04";
+  const context = { params: Promise.resolve({ courseId: id }) };
+  const toggle = (body: unknown) => unlockWeek(request(`courses/${id}`, "PATCH", body), context);
+  const list = () => weekChallenges(new Request(`http://localhost/api/courses/${id}/challenges`), context);
+  const open = (challengeId: string) =>
+    start(request("challenges", "POST", { game: "hueco", difficulty: 1, challengeId }), context);
+  const progress = async () =>
+    (await db.query<{ value: unknown }>("select course_progress($1,$2) as value", [id, student])).rows[0]!
+      .value;
+
+  await db.exec(`
+    insert into courses(id,name) values ('${id}','Adelanto');
+    insert into course_weeks(course_id,week_number,topic,confirmed)
+      values ('${id}',1,'Uno',true),('${id}',2,'Dos',true),('${id}',3,'Tres',true);
+  `);
+  await db.query(`insert into course_members(course_id,user_id,role) values ($1,$2,'teacher')`, [
+    id,
+    teacher,
+  ]);
+  await db.query("select assign_course_students($1,$2)", [id, [student]]);
+  await db.query(
+    `insert into course_documents(id,course_id,uploaded_by,kind,filename) values ('${documentId}','${id}',$1,'theory','tema.pdf')`,
+    [teacher],
+  );
+  const insertGame = (gameId: string, week: number, status: string, opens: string) =>
+    db.query(
+      `insert into generated_challenges(id,course_id,week_number,game,difficulty,payload,solution,hint,explanation,source,source_document_id,evidence,decision,status,opens_at,deadline)
+      values ($1,'${id}',$2,'hueco',1,'{}','{"optionId":"a","explanation":"Por esto."}','{}','Por esto.','{"documento":"tema.pdf"}','${documentId}','cita','{}',$3,${opens},now() + interval '17 days')`,
+      [gameId, week, status],
+    );
+  await insertGame(current, 1, "published", "null");
+  await insertGame(early, 2, "published", "now() + interval '10 days'");
+  await insertGame(draftWeek, 3, "draft", "now() + interval '17 days'");
+
+  state.userId = student;
+  expect((await toggle({ weekNumber: 2, unlocked: true })).status).toBe(403);
+  expect((await (await list()).json()).weeks[1]).toMatchObject({ state: "future", topic: null });
+  expect((await open(early)).status).toBe(422);
+
+  state.userId = teacher;
+  expect(
+    (await (await getPath(request(`courses/${id}`, "GET", undefined), context)).json()).weeks,
+  ).toMatchObject([
+    { weekNumber: 1, future: false, unlocked: false },
+    { weekNumber: 2, future: true, unlocked: false },
+    { weekNumber: 3, future: true, unlocked: false },
+  ]);
+  const notFuture = await toggle({ weekNumber: 1, unlocked: true });
+  expect(notFuture.status).toBe(409);
+  expect(await notFuture.json()).toMatchObject({ code: "WEEK_NOT_FUTURE" });
+  const noGames = await toggle({ weekNumber: 3, unlocked: true });
+  expect(noGames.status).toBe(409);
+  expect(await noGames.json()).toMatchObject({ code: "NO_GAMES" });
+  expect((await toggle({ weekNumber: 9, unlocked: false })).status).toBe(404);
+  expect((await toggle({ weekNumber: 2, unlocked: "yes" })).status).toBe(422);
+  expect(await (await toggle({ weekNumber: 2, unlocked: true })).json()).toEqual({
+    weekNumber: 2,
+    unlocked: true,
+  });
+  expect(
+    (await (await getPath(request(`courses/${id}`, "GET", undefined), context)).json()).weeks[1],
+  ).toMatchObject({ future: true, unlocked: true });
+
+  state.userId = student;
+  expect(await progress()).toMatchObject({ weeklyPlayed: 0, weeklyLimit: 2 });
+  const unlocked = await (await list()).json();
+  expect(unlocked.course.current_week).toBe(1);
+  expect(unlocked.weeks).toMatchObject([
+    { weekNumber: 1, state: "current", games: [{ id: current, status: "available" }] },
+    { weekNumber: 2, state: "unlocked", topic: "Dos", games: [{ id: early, status: "available" }] },
+  ]);
+  const session = await (await open(early)).json();
+  expect(session.week).toBe(2);
+  const answered = await answer(
+    request("answer", "POST", { answer: { optionId: "a" } }),
+    sessionContext(session.sessionId),
+  );
+  expect(await answered.json()).toMatchObject({
+    pointsAwarded: 10,
+    totals: { weeklyPlayed: 1, weeklyLimit: 2 },
+  });
+  expect((await open(current)).status).toBe(200);
+
+  // Volver a bloquear oculta lo que falta, pero no toca lo ya jugado.
+  state.userId = teacher;
+  expect((await toggle({ weekNumber: 2, unlocked: false })).status).toBe(200);
+  state.userId = student;
+  expect((await (await list()).json()).weeks[1]).toMatchObject({
+    state: "future",
+    topic: null,
+    hiddenGames: 1,
+  });
+  expect(await progress()).toMatchObject({ points: 10, weeklyLimit: 1 });
+
+  // Desbloquear adelanta la apertura; el vencimiento sigue siendo el de siempre.
+  state.userId = teacher;
+  expect((await toggle({ weekNumber: 2, unlocked: true })).status).toBe(200);
+  await insertGame(expired, 2, "published", "now() + interval '10 days'");
+  await db.query("update generated_challenges set deadline = now() - interval '1 day' where id = $1", [
+    expired,
+  ]);
+  state.userId = student;
+  expect((await (await list()).json()).weeks[1].games).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: expired, status: "missed" })]),
+  );
+  expect((await open(expired)).status).toBe(422);
+  state.userId = teacher;
 }, 30_000);
 
 it("rejects courses without a usable name and anonymous listings", async () => {

@@ -19,6 +19,8 @@ export const pathWeekSchema = z.object({
   generationStatus: z.string(),
   generationError: z.string().nullable(),
   deadline: z.string().nullable(),
+  future: z.boolean(),
+  unlocked: z.boolean(),
   games: z.array(
     z.object({ id: z.string(), game: gameSlugSchema, difficulty: z.number(), status: z.string() }),
   ),
@@ -107,6 +109,9 @@ export function uploadPdf(courseId: string, file: File, week: number) {
 }
 
 export const getCoursePath = (courseId: string) => teacherRequest(coursePath(courseId), coursePathSchema);
+
+export const setWeekUnlocked = (courseId: string, weekNumber: number, unlocked: boolean) =>
+  teacherRequest(coursePath(courseId), z.unknown(), json("PATCH", { weekNumber, unlocked }));
 
 export const generateWeek = (courseId: string, weekNumber: number) =>
   teacherRequest(`${coursePath(courseId)}/generation`, z.unknown(), json("POST", { weekNumber }));

@@ -94,10 +94,11 @@ export async function getCoursePath(courseId: string) {
   const weeks = checked(
     await db
       .from("course_weeks")
-      .select("week_number, topic, generation_status, generation_started_at, generation_error")
+      .select("week_number, topic, generation_status, generation_started_at, generation_error, unlocked_at")
       .eq("course_id", courseId)
       .order("week_number"),
   );
+  const activeWeek = checked(await db.rpc("course_active_week", { p_course: courseId })) as number;
   // An instance can die mid generation: without this the week would look busy forever.
   const isStale = (week: { generation_status: unknown; generation_started_at: unknown }) =>
     week.generation_status === "running" &&
@@ -124,6 +125,8 @@ export async function getCoursePath(courseId: string) {
         ? "La generación se interrumpió. Inténtalo de nuevo."
         : (week.generation_error as string | null),
       deadline: startsOn ? weekWindow(startsOn, week.week_number as number).deadline : null,
+      future: (week.week_number as number) > activeWeek,
+      unlocked: (week.week_number as number) > activeWeek && Boolean(week.unlocked_at),
       games: games
         .filter((game) => game.week_number === week.week_number && game.status !== "discarded")
         .map((game) => ({
@@ -134,6 +137,37 @@ export async function getCoursePath(courseId: string) {
         })),
     })),
   };
+}
+
+/** Abre una semana futura antes de su fecha, o la vuelve a cerrar. Su vencimiento no cambia. */
+export async function setWeekUnlocked(courseId: string, input: unknown) {
+  const { weekNumber, unlocked } = z
+    .object({ weekNumber: z.number().int().min(1).max(52), unlocked: z.boolean() })
+    .parse(input);
+  const db = getDatabase();
+  if (unlocked) {
+    const activeWeek = checked(await db.rpc("course_active_week", { p_course: courseId })) as number;
+    if (weekNumber <= activeWeek) throw new HttpError(409, "WEEK_NOT_FUTURE", "Esta semana ya abrió.");
+    const games = checked(
+      await db
+        .from("generated_challenges")
+        .select("id")
+        .eq("course_id", courseId)
+        .eq("week_number", weekNumber)
+        .eq("status", "published"),
+    );
+    if (!games.length) throw new HttpError(409, "NO_GAMES", "Esta semana aún no tiene juegos publicados.");
+  }
+  checked(
+    await db
+      .from("course_weeks")
+      .update({ unlocked_at: unlocked ? new Date().toISOString() : null })
+      .eq("course_id", courseId)
+      .eq("week_number", weekNumber)
+      .select("week_number")
+      .maybeSingle(),
+  );
+  return { weekNumber, unlocked };
 }
 
 async function findGame(courseId: string, gameId: string) {

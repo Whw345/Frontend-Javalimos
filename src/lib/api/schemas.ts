@@ -76,7 +76,7 @@ export type PathGame = z.infer<typeof pathGameSchema>;
 
 export const studentWeekSchema = z.object({
   weekNumber: z.number().int(),
-  state: z.enum(["past", "current", "future"]),
+  state: z.enum(["past", "current", "unlocked", "future"]),
   topic: z.string().nullable(),
   opensAt: z.iso.datetime().nullable(),
   deadline: z.iso.datetime().nullable(),

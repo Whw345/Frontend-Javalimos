@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, RotateCcw } from "lucide-react";
+import { Lock, LockOpen, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { copy } from "@/content/copy";
 import { getGameDefinition } from "@/games/registry";
 import { ApiError } from "@/lib/api/client";
-import { finishCourse, generateWeek, getCoursePath, type PathWeek } from "@/lib/api/teacher";
+import { finishCourse, generateWeek, getCoursePath, setWeekUnlocked, type PathWeek } from "@/lib/api/teacher";
 import { cn } from "@/lib/utils/cn";
 import { formatDeadline } from "@/lib/utils/schedule";
 import { nodeAccents } from "@/components/game/pathStyle";
@@ -39,14 +39,42 @@ function weekItems(week: PathWeek): WeekItem[] {
   return week.games.map((game) => ({ week, kind: "game", game }));
 }
 
-function WeekCard({ week }: { week: PathWeek }) {
+function weekNote({ unlocked, deadline }: PathWeek) {
+  if (!deadline) return unlocked ? t.unlocked : null;
+  return (unlocked ? t.unlockedDeadline : t.deadline)(formatDeadline(deadline));
+}
+
+function WeekCard({
+  week,
+  onToggle,
+  toggling,
+}: {
+  week: PathWeek;
+  onToggle?: () => void;
+  toggling: boolean;
+}) {
+  const note = weekNote(week);
+  const Icon = week.unlocked ? Lock : LockOpen;
   return (
     <div className="rounded-lg bg-(image:--gradient-dusk) p-4 text-text-on-primary">
-      <p className="type-overline">{t.week(week.weekNumber)}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="type-overline">{t.week(week.weekNumber)}</p>
+        {onToggle && (
+          <Button
+            variant="secondary"
+            aria-label={(week.unlocked ? t.lockWeek : t.unlockWeek)(week.weekNumber)}
+            loading={toggling}
+            onClick={onToggle}
+          >
+            {!toggling && <Icon aria-hidden />}
+            {week.unlocked ? t.lock : t.unlock}
+          </Button>
+        )}
+      </div>
       <h2 title={week.topic} className="line-clamp-2 type-h3">
         {week.topic}
       </h2>
-      {week.deadline && <p className="type-caption">{t.deadline(formatDeadline(week.deadline))}</p>}
+      {note && <p className="type-caption">{note}</p>}
     </div>
   );
 }
@@ -171,6 +199,14 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["teacher"] }),
   });
 
+  const unlock = useMutation({
+    mutationFn: (week: PathWeek) => setWeekUnlocked(courseId, week.weekNumber, !week.unlocked),
+    onSuccess: refresh,
+  });
+  // Antes de terminar todo es borrador: el alumno no tendría nada que jugar.
+  const canUnlock = (week: PathWeek) =>
+    setupCompleted && week.future && week.games.some((game) => game.status === "published");
+
   if (path.data && path.data.weeks.length === 0) {
     if (!embedded) return <CourseUpload existingCourseId={courseId} />;
     return (
@@ -217,11 +253,22 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
                 </p>
               </div>
             </div>
+            {unlock.isError && (
+              <p role="alert" className="type-caption text-error">
+                {unlock.error.message}
+              </p>
+            )}
             <SinePath
               segments={path.data.weeks.map((week) => ({
                 key: week.weekNumber,
                 label: t.week(week.weekNumber),
-                card: <WeekCard week={week} />,
+                card: (
+                  <WeekCard
+                    week={week}
+                    onToggle={canUnlock(week) ? () => unlock.mutate(week) : undefined}
+                    toggling={unlock.isPending && unlock.variables.weekNumber === week.weekNumber}
+                  />
+                ),
                 items: weekItems(week),
                 itemsLabel: busy(week) ? t.waiting : undefined,
               }))}

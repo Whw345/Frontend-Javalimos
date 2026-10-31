@@ -9,10 +9,10 @@ const STEP = 132;
 /** Del centro de la tarjeta a la primera casilla: nunca queda debajo de la tarjeta. */
 const CARD_GAP = WEEK_CARD_WIDTH / 2 + NODE_SIZE / 2 + 8;
 /** Alto reservado arriba para las tarjetas de semana, que se apoyan en la cresta. */
-const CREST_Y = 128;
+const CREST_Y = 156;
 const WAVE_HEIGHT = 220;
 /** Deja sitio para abrir una casilla del valle: el scroll horizontal recorta lo que sale por abajo. */
-const TRACK_HEIGHT = 516;
+const TRACK_HEIGHT = 544;
 
 export interface PathSegment<T> {
   key: string | number;

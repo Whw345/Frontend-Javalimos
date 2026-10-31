@@ -27,7 +27,7 @@ GOOGLE_CLIENT_SECRET=SECRETO_DE_GOOGLE
 
 No uses `NEXT_PUBLIC_` para las claves. `DECISION_LLM_*` sigue disponible para el adaptador HTTP de decisión del equipo; sin esa URL se utiliza LangChain con AI Gateway para decidir. El relleno de juegos utiliza AI Gateway.
 
-En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql`, `202610300005_teachers.sql`, `202610300006_course_admin.sql`, `202610300007_first_week_open.sql`, `202610300008_partial_scores.sql`, `202610300009_remove_free_text.sql`, `202610300010_reset_student_progress.sql` y `202610300011_real_weekly_total.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
+En Supabase, ejecuta **una sola vez y en orden** `supabase/migrations/202610300001_learning_pipeline.sql`, `202610300002_better_auth.sql`, `202610300003_drop_legacy_tables.sql`, `202610300004_teacher_flow.sql`, `202610300005_teachers.sql`, `202610300006_course_admin.sql`, `202610300007_first_week_open.sql`, `202610300008_partial_scores.sql`, `202610300009_remove_free_text.sql`, `202610300010_reset_student_progress.sql`, `202610300011_real_weekly_total.sql`, `202610310001_soft_delete_courses.sql` y `202610310002_unlock_weeks.sql` en SQL Editor. Crean las tablas y las de Better Auth, sin políticas de lectura para el navegador, y eliminan las tablas de la app anterior si existen. La migración inicial también crea el bucket `course-materials`, que ya no se usa.
 
 ```powershell
 pnpm dev
@@ -131,7 +131,7 @@ No se rediseñó la mecánica de los juegos existentes; `src/styles/tokens.css` 
 - Componentes nuevos: `src/components/teacher/*`, `src/components/student/*`, `src/components/brand/{Logo,CuyFrontal}.tsx`, `src/components/materials/TeacherWorkspace.tsx` y `Workspace.module.css`.
 - APIs nuevas: `src/app/api/auth/[...all]/route.ts`; `src/app/api/courses/[courseId]/{materials,generation,challenges,progress}/route.ts`; `src/app/api/challenges/[sessionId]/route.ts` y sus rutas `hint/route.ts` y `answer/route.ts`.
 - Integración existente adaptada: `src/lib/decision/provider.ts`, `src/app/api/decision/route.ts`, `src/lib/api/schemas.ts`, `src/lib/config.ts`, `src/app/page.tsx`, `src/components/game/GameShell.tsx` y `ResultScreen.tsx`. En los dos últimos solo se ajustó el destino de retorno al listado real; no se modificaron sus estilos.
-- Base de datos: `supabase/migrations/202610300001_learning_pipeline.sql` a `202610300011_real_weekly_total.sql`.
+- Base de datos: `supabase/migrations/202610300001_learning_pipeline.sql` a `202610310002_unlock_weeks.sql`.
 - Pruebas: `src/lib/server/{pipeline,routes,model}.test.ts`, `src/test/{database,server-only}.ts`, `e2e/integration.spec.ts`, `playwright.config.ts` y `vitest.config.mts`.
 - PDFs ficticios: `fixtures/{silabo,teoria,vacio}.pdf`; generador `scripts/create-pdf-fixtures.mjs`.
 - Configuración y ejecución: `package.json`, `pnpm-lock.yaml`, `.env.example`, `.gitignore`, `next.config.ts`, `tsconfig.json`, `Dockerfile` y `.dockerignore`.

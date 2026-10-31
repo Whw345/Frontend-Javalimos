@@ -1,5 +1,5 @@
 import { checkOrigin, handleApi } from "@/lib/server/errors";
-import { archiveCourse, getCoursePath } from "@/lib/server/courses";
+import { archiveCourse, getCoursePath, setWeekUnlocked } from "@/lib/server/courses";
 import { requireCourse } from "@/lib/server/supabase";
 
 export const runtime = "nodejs";
@@ -10,6 +10,15 @@ export async function GET(_request: Request, { params }: Context) {
     const { courseId } = await params;
     await requireCourse(courseId, true);
     return getCoursePath(courseId);
+  });
+}
+
+export async function PATCH(request: Request, { params }: Context) {
+  return handleApi(async () => {
+    checkOrigin(request);
+    const { courseId } = await params;
+    await requireCourse(courseId, true);
+    return setWeekUnlocked(courseId, await request.json());
   });
 }
 

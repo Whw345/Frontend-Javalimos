@@ -153,14 +153,19 @@ const isoDate = (value: unknown) => (value ? new Date(value as string).toISOStri
 
 /**
  * Camino completo del curso para un alumno. Nunca incluye solución, pista ni cita, y de las
- * semanas futuras solo dice cuántos retos traen: ni el tema ni qué juegos son.
+ * semanas futuras solo dice cuántos retos traen: ni el tema ni qué juegos son. Una semana que
+ * el docente desbloqueó deja de ser futura y se juega junto con la actual.
  */
 export async function getStudentPath(courseId: string, userId: string) {
   const db = getDatabase();
   const course = checked(await db.from("courses").select("name").eq("id", courseId).single());
   const currentWeek = checked(await db.rpc("course_active_week", { p_course: courseId })) as number;
   const weeks = checked(
-    await db.from("course_weeks").select("week_number, topic").eq("course_id", courseId).order("week_number"),
+    await db
+      .from("course_weeks")
+      .select("week_number, topic, unlocked_at")
+      .eq("course_id", courseId)
+      .order("week_number"),
   );
   const challenges = checked(
     await db
@@ -178,18 +183,20 @@ export async function getStudentPath(courseId: string, userId: string) {
       .eq("user_id", userId),
   );
   const now = Date.now();
-  const isOpen = ({ opens_at, deadline }: { opens_at: string | null; deadline: string | null }) =>
-    (!opens_at || Date.parse(opens_at) <= now) && (!deadline || Date.parse(deadline) > now);
+  const hasOpened = ({ opens_at }: { opens_at: string | null }) => !opens_at || Date.parse(opens_at) <= now;
+  const hasExpired = ({ deadline }: { deadline: string | null }) =>
+    Boolean(deadline) && Date.parse(deadline as string) <= now;
   return {
     course: { ...course, current_week: currentWeek },
     weeks: weeks
       .map((week) => {
         const weekNumber = week.week_number as number;
         const games = challenges.filter((game) => game.week_number === weekNumber);
-        const future = weekNumber > currentWeek;
+        const unlocked = weekNumber > currentWeek && Boolean(week.unlocked_at);
+        const future = weekNumber > currentWeek && !unlocked;
         return {
           weekNumber,
-          state: future ? "future" : weekNumber < currentWeek ? "past" : "current",
+          state: unlocked ? "unlocked" : future ? "future" : weekNumber < currentWeek ? "past" : "current",
           topic: future ? null : (week.topic as string),
           opensAt: isoDate(games[0]?.opens_at),
           deadline: isoDate(games[0]?.deadline),
@@ -198,7 +205,8 @@ export async function getStudentPath(courseId: string, userId: string) {
             ? []
             : games.map((game) => {
                 const session = sessions.find((item) => item.challenge_id === game.id);
-                const open = weekNumber === currentWeek && isOpen(game);
+                const open =
+                  !hasExpired(game) && (unlocked || (weekNumber === currentWeek && hasOpened(game)));
                 return {
                   id: game.id,
                   game: game.game,

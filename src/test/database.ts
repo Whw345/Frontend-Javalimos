@@ -21,6 +21,7 @@ export async function createTestDatabase() {
     "202610300010_reset_student_progress.sql",
     "202610300011_real_weekly_total.sql",
     "202610310001_soft_delete_courses.sql",
+    "202610310002_unlock_weeks.sql",
   ]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }

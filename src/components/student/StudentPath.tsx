@@ -26,6 +26,8 @@ import { PathGameNode } from "./PathGameNode";
 
 const t = copy.practice;
 
+const isOpenWeek = ({ state }: StudentWeek) => state === "current" || state === "unlocked";
+
 function weekNote(week: StudentWeek) {
   if (week.state === "future") return week.opensAt ? t.opens(formatDeadline(week.opensAt)) : t.soon;
   if (week.state === "past") return t.closed;
@@ -38,15 +40,17 @@ function WeekBanner({ week }: { week: StudentWeek }) {
     <div
       className={cn(
         "rounded-lg p-4",
-        week.state === "current"
+        isOpenWeek(week)
           ? "bg-(image:--gradient-dusk) text-text-on-primary"
           : "border border-border bg-surface text-text-muted",
       )}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="type-overline">{t.week(week.weekNumber)}</p>
-        {week.state === "current" && (
-          <span className="rounded-sm bg-text-on-primary/15 px-2 py-0.5 type-caption">{t.thisWeek}</span>
+        {isOpenWeek(week) && (
+          <span className="rounded-sm bg-text-on-primary/15 px-2 py-0.5 type-caption">
+            {week.state === "unlocked" ? t.early : t.thisWeek}
+          </span>
         )}
         {week.state === "future" && <Lock aria-hidden className="size-5" />}
       </div>
@@ -74,8 +78,8 @@ export function StudentPath({ courseId }: { courseId: string }) {
   }, [unauthorized, router]);
 
   const weeks = path.data?.weeks ?? [];
-  const currentGames = weeks.find((week) => week.state === "current")?.games ?? [];
-  const pending = currentGames.some((game) => game.status === "available");
+  const openGames = weeks.filter(isOpenWeek).flatMap((week) => week.games);
+  const pending = openGames.some((game) => game.status === "available");
   const limitReached = progress.data ? progress.data.weeklyPlayed >= progress.data.weeklyLimit : false;
   const busy = createChallenge.isPending || createChallenge.isSuccess;
 
@@ -144,9 +148,9 @@ export function StudentPath({ courseId }: { courseId: string }) {
         )}
         {path.data && !pending && (
           <div role="status" className="flex items-center gap-4">
-            <CuyFrontal expresion={currentGames.length ? "feliz" : "animo"} size={72} />
+            <CuyFrontal expresion={openGames.length ? "feliz" : "animo"} size={72} />
             <p className="type-body text-text-secondary">
-              {currentGames.length ? t.allPlayed : `${t.empty}. ${t.emptyHint}`}
+              {openGames.length ? t.allPlayed : `${t.empty}. ${t.emptyHint}`}
             </p>
           </div>
         )}
