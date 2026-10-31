@@ -29,83 +29,85 @@ const POLL_MS = 4000;
 
 const busy = (week: PathWeek) => week.generationStatus === "pending" || week.generationStatus === "running";
 
-function WeekPath({
-  week,
+type WeekItem = { week: PathWeek } & (
+  { kind: "waiting"; index: number } | { kind: "status" } | { kind: "game"; game: PathWeek["games"][number] }
+);
+
+function weekItems(week: PathWeek): WeekItem[] {
+  if (busy(week)) return [0, 1, 2].map((index) => ({ week, kind: "waiting", index }));
+  if (week.games.length === 0 || week.generationStatus === "failed") return [{ week, kind: "status" }];
+  return week.games.map((game) => ({ week, kind: "game", game }));
+}
+
+function WeekCard({ week }: { week: PathWeek }) {
+  return (
+    <div className="rounded-lg bg-(image:--gradient-dusk) p-4 text-text-on-primary">
+      <p className="type-overline">{t.week(week.weekNumber)}</p>
+      <h2 title={week.topic} className="line-clamp-2 type-h3">
+        {week.topic}
+      </h2>
+      {week.deadline && <p className="type-caption">{t.deadline(formatDeadline(week.deadline))}</p>}
+    </div>
+  );
+}
+
+function WeekNode({
+  item,
   onEdit,
   onRetry,
   retrying,
 }: {
-  week: PathWeek;
+  item: WeekItem;
   onEdit: (gameId: string) => void;
   onRetry?: () => void;
   retrying: boolean;
 }) {
-  const failed = week.generationStatus === "failed";
-  const empty = week.generationStatus === "done" && week.games.length === 0;
-  return (
-    <section aria-label={t.week(week.weekNumber)} className="flex flex-col gap-6">
-      <div className="w-full rounded-lg bg-(image:--gradient-dusk) p-4 text-text-on-primary">
-        <p className="type-overline">{t.week(week.weekNumber)}</p>
-        <h2 className="type-h3">{week.topic}</h2>
-        {week.deadline && <p className="type-caption">{t.deadline(formatDeadline(week.deadline))}</p>}
+  const { week } = item;
+  if (item.kind === "waiting") {
+    return (
+      <div className="flex size-18 animate-pulse items-center justify-center rounded-full bg-surface-raised text-text-muted shadow-[0_6px_0_var(--color-border)]">
+        <Lock aria-hidden className="size-6" />
       </div>
-      {busy(week) && (
-        <SinePath
-          items={[0, 1, 2]}
-          getKey={(index) => index}
-          label={t.waiting}
-          renderNode={() => (
-            <div className="flex size-18 animate-pulse items-center justify-center rounded-full bg-surface-raised text-text-muted shadow-[0_6px_0_var(--color-border)]">
-              <Lock aria-hidden className="size-6" />
-            </div>
-          )}
-        />
-      )}
-      {(failed || empty) && (
-        <div role="status" className="flex flex-col items-start gap-3">
-          <p className="type-body text-text-secondary">
-            {failed ? (week.generationError ?? t.failed) : t.noGames}
-          </p>
-          {onRetry && (
-            <Button variant="secondary" size="sm" loading={retrying} onClick={onRetry}>
-              <RotateCcw aria-hidden />
-              {t.retry}
-            </Button>
-          )}
-        </div>
-      )}
-      {week.games.length > 0 && !busy(week) && (
-        <SinePath
-          items={week.games}
-          getKey={(game) => game.id}
-          renderNode={(game) => {
-            const definition = getGameDefinition(game.game);
-            if (!definition) return null;
-            const Icon = definition.icon;
-            return (
-              <>
-                <button
-                  type="button"
-                  aria-label={t.editGame(definition.name, week.weekNumber)}
-                  onClick={() => onEdit(game.id)}
-                  className={cn(
-                    "flex size-18 items-center justify-center rounded-full text-text-on-primary transition-[translate,box-shadow] duration-(--duration-fast) ease-out",
-                    "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary",
-                    nodeAccents[definition.accent],
-                  )}
-                >
-                  <Icon aria-hidden className="size-8" />
-                </button>
-                <span className="w-full text-center type-caption text-text-secondary">
-                  {definition.name}
-                  <span className="block text-text-muted">{t.level(game.difficulty)}</span>
-                </span>
-              </>
-            );
-          }}
-        />
-      )}
-    </section>
+    );
+  }
+  if (item.kind === "status") {
+    return (
+      <div role="status" className="flex w-44 flex-col items-center gap-3 text-center">
+        <p className="type-body text-text-secondary">
+          {week.generationStatus === "failed" ? (week.generationError ?? t.failed) : t.noGames}
+        </p>
+        {onRetry && (
+          <Button variant="secondary" size="sm" loading={retrying} onClick={onRetry}>
+            <RotateCcw aria-hidden />
+            {t.retry}
+          </Button>
+        )}
+      </div>
+    );
+  }
+  const { game } = item;
+  const definition = getGameDefinition(game.game);
+  if (!definition) return null;
+  const Icon = definition.icon;
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={t.editGame(definition.name, week.weekNumber)}
+        onClick={() => onEdit(game.id)}
+        className={cn(
+          "flex size-18 items-center justify-center rounded-full text-text-on-primary transition-[translate,box-shadow] duration-(--duration-fast) ease-out",
+          "motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary",
+          nodeAccents[definition.accent],
+        )}
+      >
+        <Icon aria-hidden className="size-8" />
+      </button>
+      <span className="w-full text-center type-caption text-text-secondary">
+        {definition.name}
+        <span className="block text-text-muted">{t.level(game.difficulty)}</span>
+      </span>
+    </>
   );
 }
 
@@ -190,7 +192,7 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
   const generating = finished < total;
   const hasGames = weeks?.some((week) => week.games.length > 0);
   return (
-    <div className={cn(!embedded && "min-h-dvh bg-bg px-4 pt-6 md:px-6", !setupCompleted && "pb-28")}>
+    <div className={cn(!embedded && "min-h-dvh bg-bg px-4 pt-6 md:px-6 lg:px-8", !setupCompleted && "pb-28")}>
       <div className="mx-auto flex max-w-[1200px] flex-col gap-8">
         {!embedded && <TeacherHeader />}
         {path.isPending && <Skeleton className="h-96" />}
@@ -215,17 +217,24 @@ export function LearningPath({ courseId, embedded = false }: { courseId: string;
                 </p>
               </div>
             </div>
-            <div className="flex flex-col gap-12">
-              {path.data.weeks.map((week) => (
-                <WeekPath
-                  key={week.weekNumber}
-                  week={week}
+            <SinePath
+              segments={path.data.weeks.map((week) => ({
+                key: week.weekNumber,
+                label: t.week(week.weekNumber),
+                card: <WeekCard week={week} />,
+                items: weekItems(week),
+                itemsLabel: busy(week) ? t.waiting : undefined,
+              }))}
+              getKey={(item, index) => (item.kind === "game" ? item.game.id : index)}
+              renderNode={(item) => (
+                <WeekNode
+                  item={item}
                   onEdit={setEditing}
-                  onRetry={setupCompleted ? undefined : () => retry(week.weekNumber)}
-                  retrying={retrying === week.weekNumber}
+                  onRetry={setupCompleted ? undefined : () => retry(item.week.weekNumber)}
+                  retrying={retrying === item.week.weekNumber}
                 />
-              ))}
-            </div>
+              )}
+            />
           </>
         )}
       </div>

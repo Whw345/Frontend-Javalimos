@@ -2,8 +2,8 @@
 
 import { Check } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
 import { nodeAccents, nodeFills } from "@/components/game/pathStyle";
-import type { PathSlot } from "@/components/game/SinePath";
 import { Button } from "@/components/ui/Button";
 import { copy } from "@/content/copy";
 import { getGameDefinition } from "@/games/registry";
@@ -15,16 +15,23 @@ const t = copy.practice;
 
 const NODE_SIZE = 72;
 const CARD_WIDTH = 240;
-/** Se abre hacia el centro del camino; si aun así no cabe, se corre lo justo. */
+const CARD_MARGIN = 8;
+
+/** Dónde quedó la casilla dentro del tramo visible del camino, que se desplaza. */
+interface PathSlot {
+  x: number;
+  width: number;
+}
+
+/** Se abre hacia el centro de lo visible; si aun así no cabe, se corre lo justo. */
 function cardShift({ x, width }: PathSlot) {
-  if (x > width / 2) return Math.max(0, CARD_WIDTH - NODE_SIZE / 2 - x);
-  return Math.min(0, width - (x - NODE_SIZE / 2 + CARD_WIDTH));
+  if (x > width / 2) return Math.max(0, CARD_MARGIN + CARD_WIDTH - NODE_SIZE / 2 - x);
+  return Math.min(0, width - CARD_MARGIN - (x - NODE_SIZE / 2 + CARD_WIDTH));
 }
 
 interface PathGameNodeProps {
   game: PathGame;
   weekNumber: number;
-  slot: PathSlot;
   open: boolean;
   limitReached: boolean;
   disabled: boolean;
@@ -41,7 +48,6 @@ interface PathGameNodeProps {
 export function PathGameNode({
   game,
   weekNumber,
-  slot,
   open,
   limitReached,
   disabled,
@@ -51,10 +57,18 @@ export function PathGameNode({
   onPlay,
 }: PathGameNodeProps) {
   const reduceMotion = useReducedMotion();
+  const [slot, setSlot] = useState<PathSlot>({ x: 0, width: 0 });
   const definition = getGameDefinition(game.game);
   if (!definition) return null;
   const Icon = definition.icon;
   const opensLeft = slot.x > slot.width / 2;
+  const openFrom = (node: HTMLElement) => {
+    if (open) return;
+    const visible = node.closest("[data-path-scroller]")!.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
+    setSlot({ x: box.left + NODE_SIZE / 2 - visible.left, width: visible.width });
+    onOpen();
+  };
   const played = game.status === "played";
   const status = played
     ? t.played(game.points ?? 0)
@@ -76,12 +90,12 @@ export function PathGameNode({
           }}
           transition={{ duration: reduceMotion ? 0 : DURATION.base, ease: EASE.out }}
           onPointerEnter={(event) => {
-            if (event.pointerType === "mouse") onOpen();
+            if (event.pointerType === "mouse") openFrom(event.currentTarget);
           }}
           onPointerLeave={(event) => {
             if (event.pointerType === "mouse") onClose();
           }}
-          onFocus={onOpen}
+          onFocus={(event) => openFrom(event.currentTarget)}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) onClose();
           }}
@@ -102,7 +116,7 @@ export function PathGameNode({
                 type="button"
                 aria-label={t.gameLabel(definition.name, weekNumber)}
                 aria-expanded={open}
-                onClick={onOpen}
+                onClick={(event) => openFrom(event.currentTarget)}
                 className={cn(
                   "relative flex size-18 shrink-0 items-center justify-center rounded-full text-text-on-primary",
                   "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-text-on-primary",

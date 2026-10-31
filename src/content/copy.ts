@@ -10,6 +10,7 @@ export const copy = {
     loadingChallenge: "Preparando tu reto…",
     loading: "Un momento…",
     retry: "Reintentar",
+    pathLabel: "Camino del curso",
     backToChallenges: "Volver a los retos",
     comingSoon: "Próximamente",
     points: (formatted: string) => `${formatted} pts`,

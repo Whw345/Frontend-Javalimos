@@ -462,9 +462,16 @@ test("a published challenge renders the existing Hueco GameShell and submits for
   await expect(page.getByText("1 de 2 retos esta semana")).toBeVisible();
   const hueco = await page.getByRole("button", { name: "Hueco, semana 2" }).boundingBox();
   const parejas = await page.getByRole("button", { name: "Parejas, semana 2" }).boundingBox();
+  const nextWeek = await page.getByText("Abre lun 16 nov, 00:00").boundingBox();
   expect(parejas!.x).toBeGreaterThan(hueco!.x);
-  expect(parejas!.y).toBeGreaterThan(hueco!.y);
+  expect(nextWeek!.x).toBeGreaterThan(parejas!.x);
   await page.screenshot({ path: "test-results/camino-estudiante.png", fullPage: true });
+
+  await page.setViewportSize({ width: 360, height: 720 });
+  await page.reload();
+  await expect
+    .poll(() => page.locator("[data-path-scroller]").evaluate((path) => path.scrollLeft))
+    .toBeGreaterThan(0);
 
   for (const width of [320, 360, 768, 1280]) {
     await page.setViewportSize({ width, height: 720 });

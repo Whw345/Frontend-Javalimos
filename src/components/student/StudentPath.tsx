@@ -31,25 +31,28 @@ function weekNote(week: StudentWeek) {
 
 function WeekBanner({ week }: { week: StudentWeek }) {
   const note = weekNote(week);
-  const future = week.state === "future";
   return (
     <div
       className={cn(
-        "flex w-full items-start justify-between gap-3 rounded-lg p-4",
+        "rounded-lg p-4",
         week.state === "current"
           ? "bg-(image:--gradient-dusk) text-text-on-primary"
           : "border border-border bg-surface text-text-muted",
       )}
     >
-      <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2">
         <p className="type-overline">{t.week(week.weekNumber)}</p>
-        {week.topic && <h2 className="type-h3">{week.topic}</h2>}
-        {note && <p className="type-caption">{note}</p>}
+        {week.state === "current" && (
+          <span className="rounded-sm bg-text-on-primary/15 px-2 py-0.5 type-caption">{t.thisWeek}</span>
+        )}
+        {week.state === "future" && <Lock aria-hidden className="size-5" />}
       </div>
-      {week.state === "current" && (
-        <span className="shrink-0 rounded-sm bg-text-on-primary/15 px-2 py-1 type-caption">{t.thisWeek}</span>
+      {week.topic && (
+        <h2 title={week.topic} className="line-clamp-2 type-h3">
+          {week.topic}
+        </h2>
       )}
-      {future && <Lock aria-hidden className="size-5 shrink-0" />}
+      {note && <p className="type-caption">{note}</p>}
     </div>
   );
 }
@@ -140,52 +143,47 @@ export function StudentPath({ courseId }: { courseId: string }) {
           </div>
         )}
 
-        <div className="flex flex-col gap-12">
-          {weeks.map((week) => (
-            <section
-              key={week.weekNumber}
-              aria-label={t.week(week.weekNumber)}
-              className="flex flex-col gap-6"
-            >
-              <WeekBanner week={week} />
-              {week.games.length > 0 && (
-                <SinePath
-                  items={week.games}
-                  getKey={(game) => game.id}
-                  renderNode={(game, slot) => (
-                    <PathGameNode
-                      game={game}
-                      weekNumber={week.weekNumber}
-                      slot={slot}
-                      open={openGame === game.id}
-                      limitReached={limitReached}
-                      disabled={busy}
-                      loading={busy && createChallenge.variables?.challengeId === game.id}
-                      onOpen={() => setOpenGame(game.id)}
-                      onClose={() => setOpenGame((current) => (current === game.id ? null : current))}
-                      onPlay={() => play(game)}
-                    />
-                  )}
+        {path.data && (
+          <SinePath
+            startAt={path.data.course.current_week}
+            segments={weeks.map((week) => ({
+              key: week.weekNumber,
+              label: t.week(week.weekNumber),
+              card: <WeekBanner week={week} />,
+              items: [
+                ...week.games.map((game) => ({ game, weekNumber: week.weekNumber })),
+                ...Array.from({ length: week.hiddenGames }, () => ({
+                  game: null,
+                  weekNumber: week.weekNumber,
+                })),
+              ],
+            }))}
+            getKey={(item, index) => item.game?.id ?? index}
+            renderNode={({ game, weekNumber }) =>
+              game ? (
+                <PathGameNode
+                  game={game}
+                  weekNumber={weekNumber}
+                  open={openGame === game.id}
+                  limitReached={limitReached}
+                  disabled={busy}
+                  loading={busy && createChallenge.variables?.challengeId === game.id}
+                  onOpen={() => setOpenGame(game.id)}
+                  onClose={() => setOpenGame((current) => (current === game.id ? null : current))}
+                  onPlay={() => play(game)}
                 />
-              )}
-              {week.hiddenGames > 0 && (
-                <SinePath
-                  items={Array.from({ length: week.hiddenGames }, (_, index) => index)}
-                  getKey={(index) => index}
-                  renderNode={() => (
-                    <div
-                      role="img"
-                      aria-label={t.locked}
-                      className="flex size-18 items-center justify-center rounded-full bg-surface-raised text-text-muted opacity-60 shadow-[0_6px_0_var(--color-border)]"
-                    >
-                      <Lock aria-hidden className="size-6" />
-                    </div>
-                  )}
-                />
-              )}
-            </section>
-          ))}
-        </div>
+              ) : (
+                <div
+                  role="img"
+                  aria-label={t.locked}
+                  className="flex size-18 items-center justify-center rounded-full bg-surface-raised text-text-muted opacity-60 shadow-[0_6px_0_var(--color-border)]"
+                >
+                  <Lock aria-hidden className="size-6" />
+                </div>
+              )
+            }
+          />
+        )}
       </main>
     </div>
   );
