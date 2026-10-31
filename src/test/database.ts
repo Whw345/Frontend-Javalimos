@@ -1,0 +1,132 @@
+import { PGlite } from "@electric-sql/pglite";
+import { readFile } from "node:fs/promises";
+
+export async function createTestDatabase() {
+  const db = new PGlite();
+  await db.exec(`
+    create role anon; create role authenticated; create role service_role;
+    create schema auth; create table auth.users(id uuid primary key);
+    create schema storage; create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+  `);
+  await db.exec(
+    await readFile(
+      new URL("../../supabase/migrations/202610300001_learning_pipeline.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  return db;
+}
+
+// Minimal PostgREST test double backed by the actual PostgreSQL migration.
+// Storage and Auth are simulated; application queries and RPC functions execute SQL.
+export function createTestClient(db: PGlite, currentUser: () => string | null) {
+  const files = new Map<string, File>();
+  class Query {
+    columns = "*";
+    operation = "select";
+    value: unknown;
+    filters: string[] = [];
+    parameters: unknown[] = [];
+    sort = "";
+    one = false;
+    constructor(public table: string) {
+      if (!/^[a-z_]+$/.test(table)) throw new Error("Invalid test table.");
+    }
+    select(columns = "*") {
+      this.columns = columns;
+      return this;
+    }
+    insert(value: unknown) {
+      this.operation = "insert";
+      this.value = value;
+      return this;
+    }
+    update(value: unknown) {
+      this.operation = "update";
+      this.value = value;
+      return this;
+    }
+    eq(column: string, value: unknown) {
+      this.parameters.push(value);
+      this.filters.push(`${column} = $${this.parameters.length}`);
+      return this;
+    }
+    in(column: string, values: unknown[]) {
+      this.parameters.push(values);
+      this.filters.push(`${column} = any($${this.parameters.length})`);
+      return this;
+    }
+    order(column: string, options?: { ascending: boolean }) {
+      this.sort = ` order by ${column} ${options?.ascending === false ? "desc" : "asc"}`;
+      return this;
+    }
+    maybeSingle() {
+      this.one = true;
+      return this;
+    }
+    single() {
+      this.one = true;
+      return this;
+    }
+    async execute() {
+      try {
+        let sql = "";
+        const parameters = [...this.parameters];
+        const where = this.filters.length ? ` where ${this.filters.join(" and ")}` : "";
+        if (this.operation === "insert") {
+          const values = this.value as Record<string, unknown>;
+          const keys = Object.keys(values);
+          parameters.push(...Object.values(values));
+          sql = `insert into ${this.table} (${keys.join(",")}) values (${keys.map((_, index) => `$${index + 1}`).join(",")}) returning ${this.columns}`;
+        } else if (this.operation === "update") {
+          const values = this.value as Record<string, unknown>;
+          const updates = Object.entries(values).map(([key, value]) => {
+            parameters.push(value);
+            return `${key} = $${parameters.length}`;
+          });
+          sql = `update ${this.table} set ${updates.join(",")}${where} returning ${this.columns}`;
+        } else {
+          sql = `select ${this.columns} from ${this.table}${where}${this.sort}`;
+        }
+        const result = await db.query(sql, parameters);
+        return { data: this.one ? (result.rows[0] ?? null) : result.rows, error: null };
+      } catch (error) {
+        return { data: null, error };
+      }
+    }
+    then(resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) {
+      return this.execute().then(resolve, reject);
+    }
+  }
+  return {
+    files,
+    auth: {
+      getUser: async () => ({ data: { user: currentUser() ? { id: currentUser() } : null }, error: null }),
+    },
+    from: (table: string) => new Query(table),
+    async rpc(name: string, args: Record<string, unknown>) {
+      try {
+        const keys = Object.keys(args);
+        const result = await db.query<{ value: unknown }>(
+          `select ${name}(${keys.map((key, index) => `${key} => $${index + 1}`).join(",")}) as value`,
+          Object.values(args),
+        );
+        return { data: result.rows[0]!.value, error: null };
+      } catch (error) {
+        return { data: null, error };
+      }
+    },
+    storage: {
+      from: () => ({
+        upload: async (path: string, file: File) => {
+          files.set(path, file);
+          return { data: { path }, error: null };
+        },
+        remove: async (paths: string[]) => {
+          paths.forEach((path) => files.delete(path));
+          return { data: [], error: null };
+        },
+      }),
+    },
+  };
+}

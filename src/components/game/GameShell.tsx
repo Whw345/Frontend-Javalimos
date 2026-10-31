@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { copy } from "@/content/copy";
+import { API_MOCKING_ENABLED } from "@/lib/config";
 import type { AnyGameDefinition } from "@/games/registry";
 import { errorMessage } from "@/lib/api/client";
 import { useCourseProgress, useRevealHint, useSaveOutcome, useSubmitAnswer } from "@/lib/api/queries";
@@ -117,7 +118,7 @@ export function GameShell({ definition, payload }: GameShellProps) {
   };
 
   const goToResult = () => router.push(`/reto/${session.sessionId}/resultado`);
-  const leave = () => router.push(`/cursos/${session.courseId}/jugar`);
+  const leave = () => router.push(`/cursos/${session.courseId}/${API_MOCKING_ENABLED ? "jugar" : "practicar"}`);
 
   useGameHotkeys(
     {

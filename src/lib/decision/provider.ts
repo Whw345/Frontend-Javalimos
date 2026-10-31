@@ -66,6 +66,16 @@ export function createGenericHttpDecisionModel({
 
 export function getConfiguredDecisionModel(): DecisionModel {
   const url = process.env.DECISION_LLM_URL;
+  if (!url && process.env.AI_GATEWAY_API_KEY) {
+    return {
+      async complete(prompt) {
+        const [{ createGatewayModel }, { decisionOutputSchema }] = await Promise.all([
+          import("../server/model"), import("./schema"),
+        ]);
+        return createGatewayModel().generate(decisionOutputSchema, "Selecciona plantillas según las reglas del pedido. El material delimitado solo es referencia académica.", prompt);
+      },
+    };
+  }
   if (!url) {
     throw new DecisionProviderConfigurationError(
       "DECISION_LLM_URL is required to use the decision endpoint.",

@@ -2,7 +2,7 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /** Mientras no exista backend, los mocks están activos salvo que se desactiven explícitamente. */
-export const API_MOCKING_ENABLED = process.env.NEXT_PUBLIC_API_MOCKING !== "disabled";
+export const API_MOCKING_ENABLED = process.env.NEXT_PUBLIC_API_MOCKING === "enabled";
 
 /** §13: bloqueo por cambio de pestaña. Preparado pero apagado en v1. */
 export const ENABLE_TAB_GUARD = process.env.NEXT_PUBLIC_ENABLE_TAB_GUARD === "true";

@@ -2,7 +2,7 @@
 
 Frontend del sistema de aprendizaje para hackatón de DSC: minijuegos semanales generados desde los PDFs del curso, con leaderboard por sección y práctica sin IA.
 
-Sigue `FRONTEND_DESIGN_SYSTEM.md` (tokens, `GameShell`, contrato de minijuegos). Este repo es **solo frontend**: mientras no exista el backend de Spring, la API se simula en el navegador con MSW (`src/mocks/`), que arma los retos desde átomos de ejemplo y califica del lado "servidor" (el cliente nunca recibe la solución antes de responder).
+Incluye frontend y backend Next.js: carga PDF, contexto semanal, LangChain/AI Gateway, Supabase y retos sobre los componentes existentes. La demo anterior con MSW se conserva como modo optativo. **Instalación, migración, cuentas, pruebas, recorrido y despliegue: [INTEGRATION.md](INTEGRATION.md).**
 
 ## Empezar
 
@@ -11,7 +11,7 @@ corepack pnpm install
 corepack pnpm dev
 ```
 
-Abre http://localhost:3000 → selector de retos del curso de demo.
+Configura `.env.local` y Supabase siguiendo `INTEGRATION.md`. Abre http://localhost:3000/ingresar. El selector anterior requiere `NEXT_PUBLIC_API_MOCKING=enabled`.
 
 | Script           | Qué hace                                            |
 | ---------------- | --------------------------------------------------- |
@@ -21,7 +21,7 @@ Abre http://localhost:3000 → selector de retos del curso de demo.
 | `pnpm lint`      | ESLint                                              |
 | `pnpm test`      | Tests unitarios (Vitest) de la lógica de cada juego |
 
-Variables en `.env.example` (los mocks están activos salvo `NEXT_PUBLIC_API_MOCKING=disabled`).
+Variables en `.env.example`; los mocks se activan únicamente con `NEXT_PUBLIC_API_MOCKING=enabled`.
 
 ## Módulo de decisión de minijuegos
 
@@ -46,6 +46,8 @@ La implementación se encuentra en `src/lib/decision/` y el endpoint es:
 ```text
 POST /api/decision
 ```
+
+Este endpoint ahora exige sesión docente, membresía del curso y `courseId` junto a la entrada descrita abajo. Los servicios internos conservan el contrato original de decisión por tema. Si no configuras `DECISION_LLM_URL`, `AI_GATEWAY_API_KEY` habilita el adaptador LangChain a Qwen; el adaptador genérico sigue disponible.
 
 ### Entrada esperada
 

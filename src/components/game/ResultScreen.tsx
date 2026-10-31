@@ -8,6 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { copy } from "@/content/copy";
+import { API_MOCKING_ENABLED } from "@/lib/config";
 import { getGameDefinition } from "@/games/registry";
 import { useOutcome } from "@/lib/api/queries";
 import { cn } from "@/lib/utils/cn";
@@ -39,7 +40,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
   const definition = getGameDefinition(session.game);
   const stars = computeStars({ correct: result.correct, hintUsed, elapsedMs, totalMs });
   const remaining = Math.max(0, result.totals.weeklyLimit - result.totals.weeklyPlayed);
-  const playHref = `/cursos/${session.courseId}/jugar`;
+  const playHref = `/cursos/${session.courseId}/${API_MOCKING_ENABLED ? "jugar" : "practicar"}`;
 
   return (
     <div className="min-h-dvh bg-(image:--gradient-night) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
