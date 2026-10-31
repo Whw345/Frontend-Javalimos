@@ -1,161 +1,289 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# Frontend-Javalimos
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+Frontend del sistema de aprendizaje para hackatón de DSC: minijuegos semanales generados desde los PDFs del curso, con leaderboard por sección y práctica sin IA.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#cicd"><strong>CI/CD</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+Incluye frontend y backend Next.js: carga PDF, contexto semanal, LangChain/AI Gateway, Supabase y retos sobre los componentes existentes. La demo anterior con MSW se conserva como modo optativo. **Instalación, migración, cuentas, pruebas, recorrido y despliegue: [INTEGRATION.md](INTEGRATION.md).**
 
-## Features
-
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- Email and password and Google authentication with [Better Auth](https://www.better-auth.com), stored in your Supabase Postgres database
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
-
-## Demo
-
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
-
-## Deploy to Vercel
-
-Vercel deployment will guide you through creating a Supabase account and project.
-
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
-
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
-
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
-
-## Clone and run locally
-
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
-
-2. Create a Next.js app using the Supabase Starter template npx command
-
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
-
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
-
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
-
-3. Use `cd` to change into the app's directory
-
-   ```bash
-   cd with-supabase-app
-   ```
-
-4. Rename `.env.example` to `.env.local` and update the following:
-
-```env
-SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-SUPABASE_SECRET_KEY=[INSERT SUPABASE PROJECT SECRET KEY]
-DATABASE_URL=[INSERT SUPABASE TRANSACTION POOLER STRING, ENDING IN ?sslmode=no-verify]
-BETTER_AUTH_SECRET=[INSERT THE OUTPUT OF npx auth@latest secret]
-BETTER_AUTH_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=[INSERT GOOGLE OAUTH CLIENT ID]
-GOOGLE_CLIENT_SECRET=[INSERT GOOGLE OAUTH CLIENT SECRET]
-```
-
-Run [`db/better-auth.sql`](db/better-auth.sql) and then [`db/app.sql`](db/app.sql) in the SQL Editor of your Supabase project to create the tables. In production, set `BETTER_AUTH_URL` to your deployed URL.
-
-Create the Google credentials in the [Google Auth Platform](https://console.cloud.google.com/auth/clients) as a **Web application** client, with `http://localhost:3000/api/auth/callback/google` and `https://your-domain.com/api/auth/callback/google` as authorized redirect URIs.
-
-> [!NOTE]
-> The frontend never connects to the database. Pages and components call the functions in `lib/data` (such as `listMyCourses()`), and ESLint rejects direct imports of the database client. Each file in `lib/data` covers one domain, checks the session, filters by the current user, and returns plain domain types, so only that folder knows about the engine. Because the client uses the secret key and bypasses RLS, every table you create needs `grant select, insert, update, delete` to `service_role` and RLS enabled with no policies, so the Data API stays closed to anyone holding only the publishable key.
-
-Every sign-up becomes a student. Organizations are created in the SQL Editor, which stores only the hash of the API key. Generate the key with `npx auth@latest secret`:
-
-```sql
-insert into organization (name, api_key_hash)
-values ('Your organization', encode(sha256(convert_to('YOUR API KEY', 'UTF8')), 'hex'));
-```
-
-To make an existing user a teacher of that organization, or to change their course limit, call the endpoint with its API key:
+## Empezar
 
 ```bash
-curl -X POST http://localhost:3000/api/teachers -H "x-api-key: $ORGANIZATION_API_KEY" -H "content-type: application/json" -d '{"email":"teacher@example.com","courseLimit":5}'
+corepack pnpm install
+corepack pnpm dev
 ```
 
-Teachers add students to their courses by email with `inviteStudentToMyCourse()`. The student must already have an account. Deleting an organization also deletes its teachers, their courses, those courses' games and enrollments, but not the users or their student rows.
+Configura `.env.local` y Supabase siguiendo `INTEGRATION.md`. Abre http://localhost:3000/ingresar. El selector anterior requiere `NEXT_PUBLIC_API_MOCKING=enabled`.
 
-Both `SUPABASE_URL` and `SUPABASE_SECRET_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+| Script           | Qué hace                                            |
+| ---------------- | --------------------------------------------------- |
+| `pnpm dev`       | Servidor de desarrollo                              |
+| `pnpm build`     | Build de producción                                 |
+| `pnpm typecheck` | TypeScript (`strict`)                               |
+| `pnpm lint`      | ESLint                                              |
+| `pnpm test`      | Tests unitarios (Vitest) de la lógica de cada juego |
 
-5. You can now run the Next.js local development server:
+Variables en `.env.example`; los mocks se activan únicamente con `NEXT_PUBLIC_API_MOCKING=enabled`.
 
-   ```bash
-   npm run dev
-   ```
+## Módulo de decisión de minijuegos
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+El módulo de decisión recibe un tema que ya fue identificado y un Markdown que ya fue preparado por el módulo de entrada. No procesa PDFs, no extrae temas y no convierte archivos a Markdown.
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+El flujo es:
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+```text
+Tema + Markdown preparado
+        ↓
+Prompt de clasificación
+        ↓
+LLM de decisión
+        ↓
+Validación con Zod
+        ↓
+Tres minijuegos recomendados para ese tema
+```
 
-## CI/CD
+La implementación se encuentra en `src/lib/decision/` y el endpoint es:
 
-[`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) runs lint and build on every pull request and every push to `main`. If they pass, it deploys to Vercel: a preview for pull requests and production for `main`. The URL shows up in the pull request and in the repository's Deployments page. Pull requests from forks only run the checks.
+```text
+POST /api/decision
+```
 
-[`vercel.json`](vercel.json) turns off Vercel's own Git deployments, so each commit deploys once and only after its checks pass. Changes in `db/` aren't applied by the pipeline: run them in the SQL Editor before merging.
+Este endpoint ahora exige sesión docente, membresía del curso y `courseId` junto a la entrada descrita abajo. Los servicios internos conservan el contrato original de decisión por tema. Si no configuras `DECISION_LLM_URL`, `AI_GATEWAY_API_KEY` habilita el adaptador LangChain a Qwen; el adaptador genérico sigue disponible.
 
-To set it up once:
+### Entrada esperada
 
-1. Link the repository to a Vercel project. This creates `.vercel/project.json`, which is gitignored and holds the `orgId` and `projectId` used in step 3:
+El módulo que prepara la entrada debe enviar un objeto JSON por tema. Debe existir una llamada independiente por cada tema:
 
-   ```bash
-   npx vercel link
-   ```
+```json
+{
+  "topicId": "bio-101-week-03",
+  "topicName": "Fase luminosa",
+  "markdown": "## Fase luminosa\nLa fase luminosa produce ATP y NADPH..."
+}
+```
 
-2. In **Settings > Environment Variables** of the Vercel project, add the variables from `.env.example`:
+Reglas de entrada:
 
-   - **Production**: all of them, with `BETTER_AUTH_URL` set to your production URL.
-   - **Preview**: all of them except `BETTER_AUTH_URL`, so Better Auth takes the origin from each request. Use a separate Supabase project, or previews will read and write production data.
+- `topicId` identifica de manera estable el tema.
+- `topicName` es el nombre legible del tema.
+- `markdown` contiene únicamente el contenido académico preparado.
+- El Markdown debe estar delimitado por el módulo de entrada; no debe incluir instrucciones para cambiar el comportamiento del LLM.
+- El Markdown debe corresponder solamente al tema indicado en `topicName`.
 
-3. Create a token in [your Vercel account settings](https://vercel.com/account/tokens) and add these in **Settings > Secrets and variables > Actions** of the GitHub repository:
+### Salida del módulo
 
-   | Secret              | Value                                   |
-   | ------------------- | --------------------------------------- |
-   | `VERCEL_TOKEN`      | The token                               |
-   | `VERCEL_ORG_ID`     | `orgId` from `.vercel/project.json`     |
-   | `VERCEL_PROJECT_ID` | `projectId` from `.vercel/project.json` |
+El LLM debe devolver exactamente tres recomendaciones distintas, ordenadas de mayor a menor pertinencia:
 
-4. Add `https://your-domain.com/api/auth/callback/google` as an authorized redirect URI of the Google client. Preview URLs change on every deployment and Google doesn't accept wildcards, so previews only support email and password.
+```json
+{
+  "schemaVersion": "1.0",
+  "topicId": "bio-101-week-03",
+  "recommendations": [
+    {
+      "rank": 1,
+      "template": "matching",
+      "difficulty": 1,
+      "score": 0.94,
+      "confidenceLevel": "high",
+      "reason": "El contenido presenta conceptos y definiciones relacionadas."
+    },
+    {
+      "rank": 2,
+      "template": "multiple_choice",
+      "difficulty": 2,
+      "score": 0.87,
+      "confidenceLevel": "high",
+      "reason": "Permite evaluar relaciones causa-efecto."
+    },
+    {
+      "rank": 3,
+      "template": "fill_blank",
+      "difficulty": 1,
+      "score": 0.79,
+      "confidenceLevel": "medium",
+      "reason": "Incluye términos y datos explícitos."
+    }
+  ]
+}
+```
 
-## Feedback and issues
+### Valores permitidos
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+`template` es una variable nominal y siempre debe enviarse como texto, nunca como un número:
 
-## More Supabase examples
+| Valor | Cuándo usarlo |
+| --- | --- |
+| `multiple_choice` | Comprensión, relaciones causa-efecto o aplicación breve |
+| `matching` | Conceptos, definiciones, categorías, autores o ejemplos |
+| `ordering` | Procesos, procedimientos, algoritmos o etapas |
+| `fill_blank` | Fórmulas, términos, valores o definiciones con un elemento faltante |
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+`difficulty` es ordinal:
+
+| Valor | Nivel | Criterio |
+| --- | --- | --- |
+| `1` | Bajo | Recordar o reconocer una idea explícita |
+| `2` | Medio | Comprender una relación, comparar o aplicar una regla simple |
+| `3` | Alto | Aplicar o analizar varias relaciones, pasos o condiciones |
+
+`score` es un valor entre `0` y `1` utilizado para ordenar las recomendaciones. No debe interpretarse como una probabilidad estadística calibrada.
+
+`confidenceLevel` solo acepta `low`, `medium` o `high`.
+
+### Reglas de validación
+
+- Deben existir exactamente tres elementos en `recommendations`.
+- Los valores de `rank` deben ser `1`, `2` y `3`.
+- No se puede repetir `template`.
+- `score` debe estar entre `0` y `1`.
+- `difficulty` debe estar entre `1` y `3`.
+- `reason` debe explicar brevemente por qué el juego se adapta al contenido.
+- Los puntos, el tiempo y la generación de preguntas no pertenecen a este módulo; se calculan o ejecutan posteriormente.
+
+### Implementación
+
+- `src/lib/decision/schema.ts`: contrato y validación Zod.
+- `src/lib/decision/templates.ts`: catálogo de plantillas.
+- `src/lib/decision/prompt.ts`: reglas del prompt de clasificación.
+- `src/lib/decision/decide.ts`: decisión por tema.
+- `src/lib/decision/provider.ts`: adaptador HTTP genérico del proveedor LLM.
+- `src/app/api/decision/route.ts`: endpoint server-side.
+
+La API key del proveedor debe permanecer en variables de entorno del servidor (`DECISION_LLM_API_KEY`) y nunca debe enviarse desde el navegador ni versionarse en Git.
+
+### Flujo técnico del LLM genérico
+
+El módulo no depende directamente de un SDK de Claude, Gemini, OpenAI u otro proveedor. La aplicación utiliza la interfaz interna `DecisionModel` y un adaptador HTTP genérico:
+
+```text
+Cliente o módulo de entrada
+        │ POST /api/decision
+        ▼
+src/app/api/decision/route.ts
+        │ valida la solicitud y obtiene el modelo configurado
+        ▼
+src/lib/decision/decide.ts
+        │ construye el prompt para el tema
+        ▼
+src/lib/decision/prompt.ts
+        │ envía el prompt mediante DecisionModel
+        ▼
+src/lib/decision/provider.ts
+        │ POST al endpoint del proveedor configurado
+        ▼
+Proveedor LLM o gateway propio
+        │ devuelve tres recomendaciones en JSON
+        ▼
+Validación con decisionOutputSchema
+        │
+        ▼
+Respuesta JSON final de /api/decision
+```
+
+El adaptador genérico envía al proveedor:
+
+```json
+{
+  "model": "nombre-del-modelo",
+  "prompt": "Prompt construido para el tema...",
+  "responseFormat": "json",
+  "schemaVersion": "1.0"
+}
+```
+
+El proveedor debe devolver directamente `{ "recommendations": [...] }` o envolver ese objeto en una propiedad `decision`:
+
+```json
+{
+  "recommendations": [
+    {
+      "rank": 1,
+      "template": "matching",
+      "difficulty": 1,
+      "score": 0.94,
+      "confidenceLevel": "high",
+      "reason": "El contenido presenta conceptos relacionados."
+    },
+    {
+      "rank": 2,
+      "template": "multiple_choice",
+      "difficulty": 2,
+      "score": 0.87,
+      "confidenceLevel": "high",
+      "reason": "Permite evaluar relaciones causa-efecto."
+    },
+    {
+      "rank": 3,
+      "template": "fill_blank",
+      "difficulty": 1,
+      "score": 0.79,
+      "confidenceLevel": "medium",
+      "reason": "Incluye términos y datos explícitos."
+    }
+  ]
+}
+```
+
+En la implementación actual, el servicio valida la respuesta del proveedor antes de devolverla. Si el modelo devuelve una plantilla inválida, menos de tres recomendaciones, rangos repetidos o un JSON que no cumple el contrato, la respuesta se rechaza y no llega al frontend como una decisión válida.
+
+### Configuración del proveedor
+
+La configuración se realiza únicamente en `.env.local`, que no debe versionarse:
+
+```env
+DECISION_LLM_URL=https://tu-gateway-llm.example.com/decide
+DECISION_LLM_API_KEY=clave-secreta
+DECISION_LLM_MODEL=nombre-del-modelo
+```
+
+`DECISION_LLM_URL` puede apuntar a un gateway propio que traduzca este contrato a Claude, Gemini, OpenAI u otro servicio. De esta manera, cambiar de proveedor no requiere modificar la lógica de clasificación, el schema ni el endpoint de la aplicación.
+
+La API key se utiliza solamente desde `src/lib/decision/provider.ts`. Nunca debe incluirse en variables `NEXT_PUBLIC_*`, código del navegador, Markdown, commits ni respuestas HTTP.
+
+### Responsabilidades técnicas
+
+| Componente | Responsabilidad |
+| --- | --- |
+| Módulo de entrada | Entregar un tema con `topicId`, `topicName` y Markdown preparado |
+| `route.ts` | Recibir la solicitud y devolver errores HTTP |
+| `decide.ts` | Coordinar prompt, proveedor y validación |
+| `prompt.ts` | Definir las reglas de clasificación |
+| `provider.ts` | Comunicar la aplicación con el proveedor LLM |
+| `schema.ts` | Validar entrada y salida con Zod |
+| Proveedor LLM | Clasificar el tema y devolver las tres recomendaciones |
+| Frontend | Consumir las recomendaciones y mostrar los minijuegos |
+
+## Juegos implementados
+
+Los 10 de la tabla de plantillas, cada uno con su `README.md`:
+
+| #   | Juego                  | Carpeta                     |
+| --- | ---------------------- | --------------------------- |
+| 1   | Desliza                | `src/games/desliza`         |
+| 2   | Parejas                | `src/games/parejas`         |
+| 3   | Ordena                 | `src/games/ordena`          |
+| 4   | Dos cajas              | `src/games/dos-cajas`       |
+| 5   | Hueco                  | `src/games/hueco`           |
+| 6   | Encuentra el error     | `src/games/encuentra-error` |
+| 7   | ¿Quién soy?            | `src/games/quien-soy`       |
+| 8   | El intruso             | `src/games/intruso`         |
+| 9   | ¿Cuál es mayor?        | `src/games/cual-mayor`      |
+| 10  | Explícalo en una frase | `src/games/explicalo`       |
+
+Para cambiar o agregar un juego: crea `src/games/<slug>/` con `index.ts` (`GameDefinition`), componente, `schema.ts`, `logic.ts` + tests, `fixtures.ts` y `README.md`; regístralo en `src/games/registry.ts` y agrega su generador en `src/mocks/db.ts`.
+
+## Estructura
+
+```
+src/
+├── app/                 rutas (selector, reto, resultado)
+├── components/ui/       UI kit base
+├── components/game/     GameShell, GameTimer, FeedbackSheet, GameTile…
+├── components/gamification/
+├── games/               un folder por juego + registry
+├── lib/api/             cliente, esquemas zod del contrato, hooks de TanStack Query
+├── lib/hooks/           useCountdown, useGameHotkeys, useVisibilityGuard
+├── stores/              store de sesión (Zustand, uno por reto)
+├── content/copy.ts      microcopy
+├── styles/tokens.css    design tokens (Tailwind v4)
+└── mocks/               backend simulado (MSW)
+```

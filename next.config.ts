@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
+  reactStrictMode: true,
+  output: "standalone",
+  serverExternalPackages: ["markitdown-js", "pdf-parse"],
 };
 
 export default nextConfig;
