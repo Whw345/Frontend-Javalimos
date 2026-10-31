@@ -9,11 +9,13 @@ import { SinePath } from "@/components/game/SinePath";
 import { PointsCounter } from "@/components/gamification/PointsCounter";
 import { StreakBadge } from "@/components/gamification/StreakBadge";
 import { WeeklyQuota } from "@/components/gamification/WeeklyQuota";
+import { TutorialFlow } from "@/components/tutorial/TutorialFlow";
 import { Button, buttonVariants } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { copy } from "@/content/copy";
+import { getGameDefinition } from "@/games/registry";
 import { ApiError, errorMessage } from "@/lib/api/client";
 import { useCourseProgress, useCreateChallenge, useStudentPath } from "@/lib/api/queries";
 import type { PathGame, StudentWeek } from "@/lib/api/schemas";
@@ -64,6 +66,7 @@ export function StudentPath({ courseId }: { courseId: string }) {
   const progress = useCourseProgress(courseId);
   const createChallenge = useCreateChallenge(courseId);
   const [openGame, setOpenGame] = useState<string | null>(null);
+  const [tutorialGame, setTutorialGame] = useState<PathGame | null>(null);
   const unauthorized = path.error instanceof ApiError && path.error.status === 401;
   useEffect(() => {
     if (unauthorized) router.replace("/ingresar");
@@ -84,6 +87,8 @@ export function StudentPath({ courseId }: { courseId: string }) {
         onError: () => void path.refetch(),
       },
     );
+
+  const chooseGame = (game: PathGame) => setTutorialGame(game);
 
   return (
     <div className="min-h-dvh bg-(image:--gradient-night) px-4 py-8 md:px-6 lg:px-8 lg:py-12">
@@ -170,7 +175,7 @@ export function StudentPath({ courseId }: { courseId: string }) {
                   loading={busy && createChallenge.variables?.challengeId === game.id}
                   onOpen={() => setOpenGame(game.id)}
                   onClose={() => setOpenGame((current) => (current === game.id ? null : current))}
-                  onPlay={() => play(game)}
+                  onPlay={() => chooseGame(game)}
                 />
               ) : (
                 <div
@@ -185,6 +190,22 @@ export function StudentPath({ courseId }: { courseId: string }) {
           />
         )}
       </main>
+      {tutorialGame && (
+        <TutorialFlow
+          game={tutorialGame.game}
+          gameName={getGameDefinition(tutorialGame.game)?.name ?? tutorialGame.game}
+          onClose={() => {
+            const selected = tutorialGame;
+            setTutorialGame(null);
+            play(selected);
+          }}
+          onStartRealGame={() => {
+            const selected = tutorialGame;
+            setTutorialGame(null);
+            play(selected);
+          }}
+        />
+      )}
     </div>
   );
 }
